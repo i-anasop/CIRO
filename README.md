@@ -1,7 +1,7 @@
 <div align="center">
   <img src="assets/logo.png" alt="CIRO Logo" width="180"/>
-  <h1>CIRO: Crisis Intelligence & Response Orchestrator</h1>
-  <p><strong>Next-Generation Emergency Management & Field Operations Dashboard</strong></p>
+  <h1>Crisis Intelligence & Response Orchestrator (CIRO)</h1>
+  <p><strong>Enterprise-Grade Emergency Management & Field Operations Dashboard</strong></p>
   
   [![Flutter Web](https://img.shields.io/badge/Flutter-Web-02569B?logo=flutter)](https://flutter.dev/)
   [![Dart](https://img.shields.io/badge/Dart-3.0+-0175C2?logo=dart)](https://dart.dev/)
@@ -10,50 +10,51 @@
 
 <br/>
 
-## 🌐 Overview
+## 1. Overview
 
-**CIRO** (Crisis Intelligence & Response Orchestrator) is a production-grade, multi-platform emergency management dashboard. Built with Flutter, CIRO empowers field operators, dispatchers, and crisis managers with real-time intelligence, scenario simulation, and dynamic routing capabilities during critical incidents. 
+**CIRO** is a highly resilient, multi-platform emergency management dashboard. Built to serve field operators, dispatchers, and crisis management directors, CIRO delivers real-time intelligence aggregation, complex scenario simulation, and dynamic routing capabilities during critical incidents. 
 
-The application is engineered with a "Cyber-Pastel" aesthetic, prioritizing visual clarity, high-contrast critical alerts, and seamless operator UX.
-
----
-
-## ⚡ Core Features
-
-- **🌍 Interactive Crisis Mapping**
-  - Live spatial visualization of critical incidents.
-  - Multi-agent scenario routing and real-time geographical analytics.
-- **🚨 Intelligent Reporting System**
-  - Streamlined incident logging with category-specific protocols (Flooding, Fire, Grid Failures, etc.).
-  - Automated threat categorization and payload generation.
-- **🛡️ Scenario Simulation Engine (`ScenarioEngine`)**
-  - Built-in `Demo Mode` to simulate complex multi-variable crisis scenarios without affecting production systems.
-  - Generates AI-driven incident reports and situational variables.
-- **⚙️ Operator Command Center**
-  - Highly customizable operator profiles.
-  - Dynamic UI state management adapting to alert severity levels.
-  - Regional configuration, localization, and offline protocol caching.
+The architecture is designed to support high-contrast visual clarity, strictly prioritizing rapid information consumption and seamless operator user experience under high-stress conditions.
 
 ---
 
-## 🛠️ Technology Stack
+## 2. Core Capabilities
 
-- **Framework:** Flutter (Optimized for Web & Mobile)
-- **State Management:** Provider / ListenableBuilder Architecture
-- **Routing:** GoRouter (Declarative Web-Safe Routing)
-- **Mapping:** Google Maps API (via `google_maps_flutter`)
-- **External Pipelines (Pending/Mocked):** OpenWeather API, News API
+- **Interactive Crisis Mapping**
+  - Live spatial visualization of critical incident perimeters.
+  - Multi-agent scenario routing and real-time geographical analytics using Google Maps infrastructure.
+- **Intelligent Reporting Protocols**
+  - Streamlined, standardized incident logging with category-specific data structures (e.g., Hydrological, Fire, Grid Failures).
+  - Automated threat categorization and standardized payload generation for backend processing.
+- **Scenario Simulation Engine (`ScenarioEngine`)**
+  - Integrated deterministic mock environments to simulate complex, multi-variable crisis events without impacting production networks.
+  - Programmatic generation of synthetic incident reports and situational variables for operator training.
+- **Operator Command Center**
+  - Role-based customizable operator profiles and authentication workflows.
+  - Dynamic UI state management adapting fluidly to escalating alert severity levels.
+  - Configurable regional localization, privacy controls, and offline protocol caching.
 
 ---
 
-## 🚀 Getting Started
+## 3. Technology Stack
+
+- **Application Framework:** Flutter SDK (Optimized for Web & Mobile targets)
+- **Language:** Dart 3.0+
+- **State Management Architecture:** Provider / Native ListenableBuilder
+- **Routing Infrastructure:** GoRouter (Declarative, Deep-Linkable Web Routing)
+- **Geospatial Mapping:** Google Maps API (`google_maps_flutter`)
+- **External Data Pipelines:** OpenWeather API, News API (Integration ready)
+
+---
+
+## 4. System Requirements & Installation
 
 ### Prerequisites
-- [Flutter SDK](https://docs.flutter.dev/get-started/install) (Version 3.19.0 or higher)
+- [Flutter SDK](https://docs.flutter.dev/get-started/install) (v3.19.0 or higher)
 - [Dart SDK](https://dart.dev/get-dart)
-- A modern web browser (Chrome recommended for optimal rendering).
+- A modern, Chromium-based web browser for optimal rendering.
 
-### Installation
+### Build Instructions
 
 1. **Clone the repository:**
    ```bash
@@ -61,60 +62,55 @@ The application is engineered with a "Cyber-Pastel" aesthetic, prioritizing visu
    cd CIRO
    ```
 
-2. **Install dependencies:**
+2. **Resolve dependencies:**
    ```bash
    flutter pub get
    ```
 
 3. **Configure Environment Variables:**
-   Create a `.env` file in the root directory and add your API keys:
+   A `.env` file must be provisioned in the root directory prior to compilation.
    ```env
    GOOGLE_MAPS_API_KEY=your_google_maps_key
    OPENWEATHER_API_KEY=your_openweather_key
    NEWS_API_KEY=your_news_api_key
    ```
 
-4. **Run the application (Web target recommended):**
+4. **Execute the application:**
    ```bash
    flutter run -d chrome
    ```
 
 ---
 
-## 🏗️ Project Architecture
+## 5. Directory Structure & Architecture
 
 ```text
 lib/
-├── agents/        # AI orchestration and simulated pipeline logic
-├── components/    # Reusable UI widgets (Cards, Sheets, Badges)
-├── data/          # Mock data structures and initial states
-├── models/        # Core entity data classes (Crisis, Signal, Report)
-├── navigation/    # GoRouter configuration and route definitions
-├── screens/       # Main top-level UI views
-├── services/      # Singleton services (State, APIs, Location, Mocking)
-├── theme/         # Design tokens, typography, and color systems
-└── utils/         # Helper functions and cross-platform stubs
+├── agents/        # Algorithmic orchestration and simulated pipeline logic
+├── components/    # Reusable, standardized UI widget primitives
+├── data/          # Mock data structures and initial application states
+├── models/        # Core entity data classes and serialization logic
+├── navigation/    # GoRouter configuration and declarative route definitions
+├── screens/       # Top-level view controllers
+├── services/      # Singleton service layer (State, APIs, Location, Telemetry)
+├── theme/         # Centralized design tokens, typography, and color systems
+└── utils/         # Helper functions and cross-platform compilation stubs
 ```
 
 ---
 
-## 🤝 Contributing
+## 6. Contribution Guidelines
 
-Contributions, issues, and feature requests are welcome!
-Feel free to check the [issues page](https://github.com/i-anasop/CIRO/issues) for active bounties or open discussions.
+We adhere to a strict branching model and code review policy. To contribute:
 
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+1. Fork the repository.
+2. Check out a dedicated feature branch (`git checkout -b feature/issue-id-description`).
+3. Commit your changes following standard conventional commits.
+4. Push the branch (`git push origin feature/issue-id-description`).
+5. Open a Pull Request detailing architectural changes and testing procedures.
 
 ---
 
-## 📄 License
+## 7. License
 
-Distributed under the MIT License. See `LICENSE` for more information.
-
-<div align="center">
-  <p>Engineered for Resilience. Built for Response.</p>
-</div>
+Distributed under the MIT License. See `LICENSE` for further details.
