@@ -1,0 +1,183 @@
+// CIRO — Splash Screen v3
+// Minimal premium entry: light bg, blue logo, clean tagline, soft progress.
+
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../theme/colors.dart';
+import '../theme/typography.dart';
+import '../theme/spacing.dart';
+
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen>
+    with TickerProviderStateMixin {
+  late final AnimationController _logoCtrl;
+  late final AnimationController _textCtrl;
+  late final AnimationController _progressCtrl;
+
+  late final Animation<double> _logoScale;
+  late final Animation<double> _logoFade;
+  late final Animation<double> _textFade;
+  late final Animation<double> _progressVal;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _logoCtrl = AnimationController(
+        duration: const Duration(milliseconds: 800), vsync: this);
+    _textCtrl = AnimationController(
+        duration: const Duration(milliseconds: 600), vsync: this);
+    _progressCtrl = AnimationController(
+        duration: const Duration(milliseconds: 2200), vsync: this);
+
+    _logoScale = Tween<double>(begin: 0.7, end: 1.0).animate(
+      CurvedAnimation(parent: _logoCtrl, curve: Curves.easeOutBack));
+    _logoFade  = CurvedAnimation(parent: _logoCtrl,    curve: Curves.easeIn);
+    _textFade  = CurvedAnimation(parent: _textCtrl,    curve: Curves.easeIn);
+    _progressVal = CurvedAnimation(parent: _progressCtrl, curve: Curves.easeInOut);
+
+    _logoCtrl.forward().then((_) {
+      _textCtrl.forward();
+      _progressCtrl.forward();
+    });
+
+    Future.delayed(const Duration(milliseconds: 3000), () {
+      if (mounted) context.go('/location');
+    });
+  }
+
+  @override
+  void dispose() {
+    _logoCtrl.dispose();
+    _textCtrl.dispose();
+    _progressCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: CiroColors.bg1,
+      body: SafeArea(
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Center Content (Moved a bit up with padding)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 50),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // ── Logo ────────────────────────────────────────────────────
+                    ScaleTransition(
+                      scale: _logoScale,
+                      child: FadeTransition(
+                        opacity: _logoFade,
+                        child: _buildLogo(),
+                      ),
+                    ),
+
+                    const SizedBox(height: CiroSpacing.xxl),
+
+                    // ── Text ────────────────────────────────────────────────────
+                    FadeTransition(
+                      opacity: _textFade,
+                      child: Column(children: [
+                        Text('CIRO',
+                            style: CiroTypography.displayLarge.copyWith(
+                              letterSpacing: 4,
+                            )),
+                        const SizedBox(height: CiroSpacing.sm),
+                        Text(
+                          'Crisis Intelligence & Response Orchestrator',
+                          style: CiroTypography.bodyMedium.copyWith(
+                            color: CiroColors.textSecondary,
+                            fontSize: 12.5,
+                            letterSpacing: 0.5,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ]),
+                    ),
+
+                    const SizedBox(height: CiroSpacing.huge),
+
+                    // ── Progress bar ─────────────────────────────────────────────
+                    FadeTransition(
+                      opacity: _textFade,
+                      child: SizedBox(
+                        width: 180,
+                        child: Column(children: [
+                          AnimatedBuilder(
+                            animation: _progressVal,
+                            builder: (_, __) => ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value:     _progressVal.value,
+                                minHeight: 3,
+                                backgroundColor: CiroColors.border,
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                    CiroColors.brand),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: CiroSpacing.md),
+                          Text('Initializing agent pipeline...',
+                              style: CiroTypography.caption),
+                        ]),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // ── Version tag at the very bottom ──────────────────────────────────
+            Positioned(
+              bottom: 20,
+              child: FadeTransition(
+                opacity: _textFade,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: CiroSpacing.md, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: CiroColors.bg4,
+                    borderRadius: BorderRadius.circular(CiroSpacing.radiusCirc),
+                  ),
+                  child: Text('v1.0.0',
+                      style: CiroTypography.caption
+                          .copyWith(color: CiroColors.textMuted, fontWeight: FontWeight.w500)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLogo() {
+    return Container(
+      width: 110, height: 110,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: CiroColors.brandAccent.withValues(alpha: 0.25),
+            blurRadius: 32, spreadRadius: 4,
+          ),
+        ],
+      ),
+      child: ClipOval(
+        child: Image.asset('assets/logo.png', fit: BoxFit.cover),
+      ),
+    );
+  }
+}
