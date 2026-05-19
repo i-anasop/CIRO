@@ -5,6 +5,7 @@ import 'demo_scenario.dart';
 import 'crisis.dart';
 import 'agent_log.dart';
 import 'simulation_result.dart';
+import 'orchestration_models.dart';
 
 /// Resource allocation summary from the Resource Agent.
 class ResourceAllocation {
@@ -42,6 +43,12 @@ class PipelineResult {
   final SimulationResult simulation;
   final VerificationDecision verification;
   final List<AgentLog> agentLogs;
+  final List<SignalAssessment> signalAssessments;
+  final CrisisEvolution evolution;
+  final List<ResourceDecision> resourceDecisions;
+  final List<StakeholderNotification> stakeholderNotifications;
+  final MultiCrisisCoordination coordination;
+  final List<AntigravityTraceEvent> antigravityTrace;
   final DateTime generatedAt;
 
   const PipelineResult({
@@ -53,6 +60,25 @@ class PipelineResult {
     required this.simulation,
     required this.verification,
     required this.agentLogs,
+    this.signalAssessments = const [],
+    required this.evolution,
+    this.resourceDecisions = const [],
+    this.stakeholderNotifications = const [],
+    required this.coordination,
+    this.antigravityTrace = const [],
     required this.generatedAt,
   });
+
+  String get antigravityTraceExport {
+    final rows = antigravityTrace.map((e) {
+      final escapedOutput = e.output.replaceAll('"', '\\"');
+      final escapedEvidence = e.evidence.replaceAll('"', '\\"');
+      final escapedMetadata = e.metadata.toString().replaceAll('"', '\\"');
+      return '  {"step":${e.step},"agent":"${e.agent}",'
+          '"action":"${e.action}","confidence":${e.confidence},'
+          '"output":"$escapedOutput","evidence":"$escapedEvidence",'
+          '"metadata":"$escapedMetadata"}';
+    }).join(',\n');
+    return '[\n$rows\n]';
+  }
 }

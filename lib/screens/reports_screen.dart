@@ -1,13 +1,8 @@
-// CIRO — Reports Screen v6
-// Exact pixel-perfect implementation of the provided UI design (Screen 3).
-// 100% interactive and fully functional dynamic reporting: stateful media attachments, custom voice recording waveform, automatic GPS coordinate fetching, dynamic AI classification cards, and real crisis state injection that redirects straight to the Google Map situation overlay!
-
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
 import '../services/location_service.dart';
 import '../services/scenario_engine.dart';
-
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -17,882 +12,1138 @@ class ReportsScreen extends StatefulWidget {
 }
 
 class _ReportsScreenState extends State<ReportsScreen> {
-  bool _isAnalyzing = false;
-  bool _isAnalyzed = false;
-  
-  // Media attachments state variables
-  bool _photoAttached = false;
-  bool _videoAttached = false;
-  bool _voiceAttached = false;
-  bool _locationAttached = false;
-  String _fetchedLocationName = '';
-  double? _fetchedLat;
-  double? _fetchedLng;
+  static const _brand = Color(0xFF5A5CE5);
+  static const _text = Color(0xFF0F172A);
+  static const _muted = Color(0xFF64748B);
+  static const _border = Color(0xFFE2E8F0);
 
-  // Active category type chip state
+  final TextEditingController _postController = TextEditingController();
+  final List<_FeedItem> _feed = _seedFeed();
   String _selectedType = 'Flood';
+  bool _photoAttached = false;
+  bool _locationAttached = false;
+  bool _analyzing = false;
+  String _locationLabel = 'G-10, Islamabad';
+  double _lat = 33.6946;
+  double _lng = 73.0179;
 
-  // Voice recording state overlay
-  bool _isRecordingVoice = false;
-  int _secondsRecorded = 0;
-  Timer? _recordingTimer;
-
-  late final TextEditingController _controller;
-
-  // Pre-configured crisis templates for dynamic chip selection
   final Map<String, _CrisisTemplate> _templates = {
-    'Flood': _CrisisTemplate(
-      complaint: 'Water has entered the underpass near F-7 Markaz. Vehicles are stuck and people are struggling to pass through.',
+    'Flood': const _CrisisTemplate(
       title: 'Urban Flooding',
-      location: 'F-7 Underpass, Islamabad',
-      lat: 33.7200,
-      lng: 73.0600,
-      confidence: '91%',
-      action: 'Deploy water rescue unit and block management to affected underpass.',
-      severityColor: Colors.red,
-      icon: Icons.thunderstorm_rounded,
-      chipIcon: Icons.water,
-    ),
-    'Accident': _CrisisTemplate(
-      complaint: 'A major pile-up occurred on Srinagar Highway near G-9. Multiple cars are damaged and blocking lanes.',
-      title: 'Vehicle Collision / Accident',
-      location: 'Srinagar Highway, Islamabad',
-      lat: 33.6840,
-      lng: 73.0450,
-      confidence: '88%',
-      action: 'Dispatch ambulance fleet and capital traffic police to manage Srinagar Highway lanes.',
-      severityColor: Colors.orange,
-      icon: Icons.car_crash_rounded,
-      chipIcon: Icons.car_crash_rounded,
-    ),
-    'Power Outage': _CrisisTemplate(
-      complaint: 'Heavy blackout in sector G-10/2. The main street lighting and grid transformers are down after a loud pop.',
-      title: 'Grid Infrastructure Failure',
-      location: 'G-10/2 Grid Station, Islamabad',
+      prompt:
+          'Water is rising near G-10 Markaz. Service road traffic is slowing and residents need drainage support.',
+      location: 'G-10 Markaz',
       lat: 33.6946,
       lng: 73.0179,
-      confidence: '95%',
-      action: 'Escalate grid ticket to Islamabad Electric Supply Company (IESCO) engineering team.',
-      severityColor: const Color(0xFFFBC02D),
-      icon: Icons.electrical_services_rounded,
-      chipIcon: Icons.power_off_rounded,
+      color: Color(0xFF2563EB),
+      icon: Icons.water_drop_rounded,
     ),
-    'Road Blockage': _CrisisTemplate(
-      complaint: 'A major tree structural collapse has completely blocked the Margalla Road corridor. Both lanes are unusable.',
-      title: 'Roadway Obstruction',
-      location: 'Margalla Road, Islamabad',
-      lat: 33.7300,
-      lng: 73.0500,
-      confidence: '94%',
-      action: 'Dispatch city clearance and heavy crane teams to clear fallen debris.',
-      severityColor: const Color(0xFFFBC02D),
-      icon: Icons.remove_road_rounded,
-      chipIcon: Icons.remove_road_rounded,
+    'Accident': const _CrisisTemplate(
+      title: 'Road Accident',
+      prompt:
+          'Multiple vehicles are blocking a lane. Traffic needs diversion and emergency support.',
+      location: 'Srinagar Highway',
+      lat: 33.6840,
+      lng: 73.0450,
+      color: Color(0xFFF97316),
+      icon: Icons.car_crash_rounded,
     ),
-    'Heatwave': _CrisisTemplate(
-      complaint: 'Thermal stress advisories. Ground sensors in capital park regions show temperatures rising above 47°C.',
-      title: 'Extreme Heat Advisory',
-      location: 'Shakarparrian Forest Park, Islamabad',
-      lat: 33.6800,
-      lng: 73.0600,
-      confidence: '90%',
-      action: 'Activate public cooling water stations and broadcast hydration push warnings.',
-      severityColor: Colors.teal,
-      icon: Icons.wb_sunny_rounded,
-      chipIcon: Icons.wb_sunny_rounded,
+    'Power': const _CrisisTemplate(
+      title: 'Power Outage',
+      prompt:
+          'Street lights and homes are without power. Utility repair support may be needed.',
+      location: 'G-10/2',
+      lat: 33.6970,
+      lng: 73.0150,
+      color: Color(0xFFF59E0B),
+      icon: Icons.power_off_rounded,
+    ),
+    'Heat': const _CrisisTemplate(
+      title: 'Heat Stress',
+      prompt:
+          'Outdoor workers and elderly residents need cooling support and water access.',
+      location: 'F-10',
+      lat: 33.6992,
+      lng: 73.0096,
+      color: Color(0xFF14B8A6),
+      icon: Icons.thermostat_rounded,
     ),
   };
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: _templates['Flood']!.complaint);
+    _postController.text = _templates[_selectedType]!.prompt;
   }
 
   @override
   void dispose() {
-    _controller.dispose();
-    _recordingTimer?.cancel();
+    _postController.dispose();
     super.dispose();
   }
 
-  // ── Stateful Action Handlers ───────────────────────────────────────────────
-
-  void _onChipSelected(String label) {
-    if (label == '... More') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Additional crisis catalog: Utility Break / Gas Leak / Bio Hazard.')),
-      );
-      return;
-    }
-    setState(() {
-      _selectedType = label;
-      _controller.text = _templates[label]!.complaint;
-      // Reset analysis overlay to allow freshly re-running AI classifications
-      _isAnalyzed = false;
-    });
-  }
-
-  // Media Button click triggers state attachments
-  void _attachPhoto() {
-    setState(() {
-      _photoAttached = !_photoAttached;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(_photoAttached ? '📸 Image attachment attached: underpass_flood.jpg' : '📸 Image attachment removed'),
-        duration: const Duration(seconds: 1),
-      ),
-    );
-  }
-
-  void _attachVideo() {
-    setState(() {
-      _videoAttached = !_videoAttached;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(_videoAttached ? '📹 Video attachment attached: water_flow.mp4' : '📹 Video attachment removed'),
-        duration: const Duration(seconds: 1),
-      ),
-    );
-  }
-
-  void _startVoiceRecording() {
-    setState(() {
-      _isRecordingVoice = true;
-      _secondsRecorded = 0;
-    });
-    _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        _secondsRecorded++;
-      });
-      if (_secondsRecorded >= 4) {
-        _stopVoiceRecording();
-      }
-    });
-  }
-
-  void _stopVoiceRecording() {
-    _recordingTimer?.cancel();
-    setState(() {
-      _isRecordingVoice = false;
-      _voiceAttached = true;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('🎙️ Audio recording attached: voice_memo_047.wav'), duration: Duration(seconds: 1)),
-    );
-  }
-
-  Future<void> _fetchGPSLocation() async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('📍 Querying device GPS coordinates...'), duration: Duration(seconds: 1)),
-    );
+  Future<void> _attachLocation() async {
     final loc = await LocationService.instance.getCurrentLocation();
     setState(() {
+      _locationAttached = true;
       if (loc.latitude != null && loc.longitude != null) {
-        _fetchedLat = loc.latitude;
-        _fetchedLng = loc.longitude;
-        _fetchedLocationName = 'My Location (${loc.latitude!.toStringAsFixed(4)}, ${loc.longitude!.toStringAsFixed(4)})';
-        _locationAttached = true;
+        _lat = loc.latitude!;
+        _lng = loc.longitude!;
+        _locationLabel =
+            'My location (${_lat.toStringAsFixed(4)}, ${_lng.toStringAsFixed(4)})';
       } else {
-        _fetchedLat = 33.7200;
-        _fetchedLng = 73.0600;
-        _fetchedLocationName = 'F-7 Markaz, Islamabad (Fallback GPS)';
-        _locationAttached = true;
+        final template = _templates[_selectedType]!;
+        _lat = template.lat;
+        _lng = template.lng;
+        _locationLabel = '${template.location} fallback';
       }
     });
+  }
+
+  Future<void> _postReport() async {
+    final text = _postController.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() => _analyzing = true);
+    await Future.delayed(const Duration(milliseconds: 700));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('📍 Attached location: $_fetchedLocationName'), duration: const Duration(seconds: 1)),
-    );
-  }
 
-  void _triggerAIAnalysis() {
+    final template = _templates[_selectedType]!;
+    final item = _FeedItem(
+      author: 'You',
+      handle: '@local_reporter',
+      time: 'now',
+      title: template.title,
+      body: text,
+      location: _locationAttached ? _locationLabel : template.location,
+      tag: 'New',
+      icon: template.icon,
+      color: template.color,
+      likes: 0,
+      comments: 0,
+      shares: 0,
+    );
+
+    ScenarioEngine.instance.overrideLocation(
+      item.location,
+      lat: _locationAttached ? _lat : template.lat,
+      lng: _locationAttached ? _lng : template.lng,
+    );
+
     setState(() {
-      _isAnalyzing = true;
-      _isAnalyzed = false;
-    });
-    // Elegant pipeline loading state for premium operation prototype
-    Future.delayed(const Duration(milliseconds: 1200), () {
-      if (mounted) {
-        setState(() {
-          _isAnalyzing = false;
-          _isAnalyzed = true;
-        });
-      }
+      _feed.insert(0, item);
+      _analyzing = false;
+      _photoAttached = false;
+      _locationAttached = false;
+      _locationLabel = 'G-10, Islamabad';
+      _postController.text = template.prompt;
     });
   }
 
-  // Inject Custom reported crisis to central engine and jump maps!
-  void _injectCrisisToSystem() {
-    final template = _templates[_selectedType] ?? _templates['Flood']!;
-    final locationLabel = _locationAttached ? _fetchedLocationName : template.location;
-    final finalLat = _locationAttached ? (_fetchedLat ?? template.lat) : template.lat;
-    final finalLng = _locationAttached ? (_fetchedLng ?? template.lng) : template.lng;
-
-    // Trigger state injection overlay in scenario engine
-    ScenarioEngine.instance.overrideLocation(locationLabel, lat: finalLat, lng: finalLng);
-
-    // Dynamic toast notification
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: const Color(0xFF4F46E5),
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                '🚨 Crisis Reported! View in Home Dashboard',
-                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    // Instant seamless navigation redirect directly to live home screen!
-    context.go('/home');
+  void _selectType(String type) {
+    final template = _templates[type]!;
+    setState(() {
+      _selectedType = type;
+      _postController.text = template.prompt;
+      _lat = template.lat;
+      _lng = template.lng;
+      _locationLabel = template.location;
+      _locationAttached = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    const brandColor = Color(0xFF4F46E5);
-    const titleColor = Color(0xFF0F172A);
-    const subtitleColor = Color(0xFF64748B);
-
-    final activeTemplate = _templates[_selectedType] ?? _templates['Flood']!;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFF8FAFC),
-        elevation: 0,
-        centerTitle: true,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 14),
-          child: Center(
-            child: GestureDetector(
-              onTap: () => context.go('/home'),
-              child: Container(
-                width: 36, height: 36,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: const Icon(Icons.arrow_back_ios_new_rounded, size: 14, color: titleColor),
-              ),
-            ),
-          ),
-        ),
-        title: const Text(
-          'Report a Crisis',
-          style: TextStyle(color: titleColor, fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 14),
-            child: Center(
-              child: Container(
-                width: 36, height: 36,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.more_horiz_rounded, size: 16, color: titleColor),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Reporting options: Save Draft / Discard Report.')),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
       body: SafeArea(
-        child: Stack(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 110),
           children: [
-            SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ── Card 1: Describe & Attachments ─────────────────────────
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.03),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
+            Row(
+              children: [
+                _IconCircle(
+                  icon: Icons.arrow_back_rounded,
+                  onTap: () => context.go('/home'),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Crisis Feed',
+                        style: TextStyle(
+                          color: _text,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
                         ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.edit_outlined, size: 18, color: subtitleColor),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'Describe what\'s happening...',
-                              style: TextStyle(color: subtitleColor, fontSize: 13, fontWeight: FontWeight.w600),
-                            ),
-                          ],
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Local alerts, reports, and response updates',
+                        style: TextStyle(
+                          color: _muted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                         ),
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9), // Light grey matching screenshot
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: TextField(
-                            controller: _controller,
-                            maxLines: 4,
-                            style: const TextStyle(color: titleColor, fontSize: 14, fontWeight: FontWeight.w500, height: 1.5),
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                        
-                        // Media Attaching Indicators subtext
-                        Text(
-                          _locationAttached
-                              ? '📍 Location: $_fetchedLocationName'
-                              : (_photoAttached || _videoAttached || _voiceAttached
-                                  ? '📎 Attachments loaded successfully'
-                                  : 'Add photos, videos or location'),
-                          style: const TextStyle(color: subtitleColor, fontSize: 11, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 12),
-                        
-                        // Actionable Media Buttons Row
-                        Row(
-                          children: [
-                            _buildMediaBtn(Icons.image_outlined, _attachPhoto, _photoAttached),
-                            const SizedBox(width: 12),
-                            _buildMediaBtn(Icons.videocam_outlined, _attachVideo, _videoAttached),
-                            const SizedBox(width: 12),
-                            _buildMediaBtn(Icons.mic_none_rounded, _startVoiceRecording, _voiceAttached),
-                            const SizedBox(width: 12),
-                            _buildMediaBtn(Icons.location_on_outlined, _fetchGPSLocation, _locationAttached, isBlue: true),
-                          ],
-                        ),
-                      ],
+                      ),
+                    ],
+                  ),
+                ),
+                _IconCircle(
+                  icon: Icons.map_rounded,
+                  onTap: () => context.go('/map'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _ComposerCard(
+              controller: _postController,
+              selectedType: _selectedType,
+              templates: _templates,
+              photoAttached: _photoAttached,
+              locationAttached: _locationAttached,
+              locationLabel: _locationLabel,
+              analyzing: _analyzing,
+              onTypeSelected: _selectType,
+              onPhoto: () => setState(() => _photoAttached = !_photoAttached),
+              onLocation: _attachLocation,
+              onPost: _postReport,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Latest nearby reports',
+                    style: TextStyle(
+                      color: _text,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(height: 24),
+                ),
+                _SmallChip(
+                  icon: Icons.verified_rounded,
+                  label: '${_feed.length} active',
+                  color: _brand,
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            ..._feed.map((item) => _SocialPostCard(item: item)),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-                  // ── Card 2: Crisis Type Selection ──────────────────────────
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.03),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+class _ComposerCard extends StatelessWidget {
+  final TextEditingController controller;
+  final String selectedType;
+  final Map<String, _CrisisTemplate> templates;
+  final bool photoAttached;
+  final bool locationAttached;
+  final String locationLabel;
+  final bool analyzing;
+  final ValueChanged<String> onTypeSelected;
+  final VoidCallback onPhoto;
+  final VoidCallback onLocation;
+  final VoidCallback onPost;
+
+  const _ComposerCard({
+    required this.controller,
+    required this.selectedType,
+    required this.templates,
+    required this.photoAttached,
+    required this.locationAttached,
+    required this.locationLabel,
+    required this.analyzing,
+    required this.onTypeSelected,
+    required this.onPhoto,
+    required this.onLocation,
+    required this.onPost,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: _box(22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const CircleAvatar(
+                radius: 19,
+                backgroundColor: Color(0xFF5A5CE5),
+                child: Icon(Icons.person_rounded, color: Colors.white),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  maxLines: 3,
+                  minLines: 2,
+                  style: const TextStyle(
+                    color: _ReportsScreenState._text,
+                    fontSize: 13,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'What is happening near you?',
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    contentPadding: const EdgeInsets.all(12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(18),
+                      borderSide: const BorderSide(
+                        color: _ReportsScreenState._border,
+                      ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Select Crisis Type',
-                              style: TextStyle(color: titleColor, fontSize: 14, fontWeight: FontWeight.bold),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFEEF2FF),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Text(
-                                'AI suggested',
-                                style: TextStyle(color: brandColor, fontSize: 10.5, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        // First Row
-                        Row(
-                          children: [
-                            Expanded(child: _buildCrisisChip('Flood', _templates['Flood']!.chipIcon)),
-                            const SizedBox(width: 10),
-                            Expanded(child: _buildCrisisChip('Accident', _templates['Accident']!.chipIcon)),
-                            const SizedBox(width: 10),
-                            Expanded(child: _buildCrisisChip('Power Outage', _templates['Power Outage']!.chipIcon)),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        
-                        // Second Row
-                        Row(
-                          children: [
-                            Expanded(child: _buildCrisisChip('Road Blockage', _templates['Road Blockage']!.chipIcon)),
-                            const SizedBox(width: 10),
-                            Expanded(child: _buildCrisisChip('Heatwave', _templates['Heatwave']!.chipIcon)),
-                            const SizedBox(width: 10),
-                            Expanded(child: _buildCrisisChip('... More', Icons.more_horiz_rounded, isOutline: true)),
-                          ],
-                        ),
-                      ],
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(18),
+                      borderSide: const BorderSide(
+                        color: _ReportsScreenState._border,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 24),
-
-                  // ── Action Button: Analyze Report ──────────────────────────
-                  GestureDetector(
-                    onTap: _triggerAIAnalysis,
-                    child: Container(
-                      width: double.infinity,
-                      height: 52,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: templates.entries.map((entry) {
+                final selected = selectedType == entry.key;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: GestureDetector(
+                    onTap: () => onTypeSelected(entry.key),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0F172A),
-                        borderRadius: BorderRadius.circular(26),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF0F172A).withValues(alpha: 0.15),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                        color: selected
+                            ? entry.value.color.withValues(alpha: 0.12)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: selected
+                              ? entry.value.color
+                              : _ReportsScreenState._border,
+                        ),
                       ),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          if (_isAnalyzing)
-                            const SizedBox(
-                              width: 18, height: 18,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                            )
-                          else ...[
-                            const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 18),
-                            const SizedBox(width: 10),
-                            const Text(
-                              'Analyze Report',
-                              style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                          Icon(
+                            entry.value.icon,
+                            size: 15,
+                            color: selected
+                                ? entry.value.color
+                                : _ReportsScreenState._muted,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            entry.key,
+                            style: TextStyle(
+                              color: selected
+                                  ? entry.value.color
+                                  : _ReportsScreenState._text,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
                             ),
-                          ],
+                          ),
                         ],
                       ),
                     ),
                   ),
-                  
-                  // ── Card 3: Dynamic Analysis Result Overlay ──────────────────
-                  if (_isAnalyzed) ...[
-                    const SizedBox(height: 24),
-                    
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        // Premium light lavender gradient style exactly matching your picture
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFF5F3FF), Color(0xFFFAE8FF)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(28),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF8B5CF6).withValues(alpha: 0.05),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Analysis Result',
-                                style: TextStyle(color: Color(0xFF8B5CF6), fontSize: 13, fontWeight: FontWeight.bold),
-                              ),
-                              Text(
-                                'Just now',
-                                style: TextStyle(color: subtitleColor, fontSize: 10.5, fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-
-                          // Row 1: Detected Crisis
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.05),
-                                      blurRadius: 8,
-                                    ),
-                                  ],
-                                ),
-                                child: Icon(activeTemplate.icon, color: activeTemplate.severityColor, size: 20),
-                              ),
-                              const SizedBox(width: 14),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Detected Crisis',
-                                    style: TextStyle(color: subtitleColor, fontSize: 10, fontWeight: FontWeight.bold),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    activeTemplate.title,
-                                    style: TextStyle(color: activeTemplate.severityColor, fontSize: 14, fontWeight: FontWeight.w900),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Row 2: Location
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.05),
-                                      blurRadius: 8,
-                                    ),
-                                  ],
-                                ),
-                                child: const Icon(Icons.location_on_outlined, color: Color(0xFF8B5CF6), size: 20),
-                              ),
-                              const SizedBox(width: 14),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Location',
-                                    style: TextStyle(color: subtitleColor, fontSize: 10, fontWeight: FontWeight.bold),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    _locationAttached ? _fetchedLocationName : activeTemplate.location,
-                                    style: const TextStyle(color: titleColor, fontSize: 13, fontWeight: FontWeight.bold),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 18),
-
-                          // Row 3: Confidence & Verification pills
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildStatusPill(
-                                  Icons.ssid_chart_rounded,
-                                  'Confidence',
-                                  activeTemplate.confidence,
-                                  const Color(0xFF4F46E5),
-                                  const Color(0xFFEEF2FF),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _buildStatusPill(
-                                  Icons.adjust_rounded,
-                                  'Verification',
-                                  'Pending',
-                                  const Color(0xFFF97316),
-                                  const Color(0xFFFFF7ED),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-
-                          // Row 4: Suggested Action Nesting Card (Tap to inject & maps routing!)
-                          GestureDetector(
-                            onTap: _injectCrisisToSystem,
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.02),
-                                    blurRadius: 10,
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Text(
-                                          'Suggested Action',
-                                          style: TextStyle(color: Color(0xFF8B5CF6), fontSize: 10.5, fontWeight: FontWeight.bold),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          activeTemplate.action,
-                                          style: const TextStyle(color: titleColor, fontSize: 12, fontWeight: FontWeight.w600, height: 1.4),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Container(
-                                    width: 32, height: 32,
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFFF5F3FF),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(Icons.arrow_forward_rounded, color: Color(0xFF8B5CF6), size: 14),
-                                  ),
-                                ],
-                              ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _ComposerTool(
+                icon: Icons.image_outlined,
+                label: photoAttached ? 'Photo added' : 'Photo',
+                active: photoAttached,
+                onTap: onPhoto,
+              ),
+              const SizedBox(width: 8),
+              _ComposerTool(
+                icon: Icons.location_on_outlined,
+                label: locationAttached ? 'Location added' : 'Location',
+                active: locationAttached,
+                onTap: onLocation,
+              ),
+              const Spacer(),
+              Material(
+                color: _ReportsScreenState._brand,
+                borderRadius: BorderRadius.circular(999),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(999),
+                  onTap: analyzing ? null : onPost,
+                  child: Container(
+                    height: 40,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    alignment: Alignment.center,
+                    child: analyzing
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                            'Post',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
                             ),
                           ),
-                        ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (locationAttached) ...[
+            const SizedBox(height: 10),
+            _SmallChip(
+              icon: Icons.my_location_rounded,
+              label: locationLabel,
+              color: _ReportsScreenState._brand,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SocialPostCard extends StatefulWidget {
+  final _FeedItem item;
+  const _SocialPostCard({required this.item});
+
+  @override
+  State<_SocialPostCard> createState() => _SocialPostCardState();
+}
+
+class _SocialPostCardState extends State<_SocialPostCard> {
+  late int _likes = widget.item.likes;
+  late int _comments = widget.item.comments;
+  late int _shares = widget.item.shares;
+  bool _liked = false;
+  final List<String> _localComments = [];
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: _box(22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: item.color.withValues(alpha: 0.12),
+                child: Icon(item.icon, color: item.color, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            item.author,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: _ReportsScreenState._text,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.verified_rounded,
+                          color: item.color,
+                          size: 14,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${item.handle} · ${item.time}',
+                      style: const TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
-                  const SizedBox(height: 80), // Scaffold navigation padding bottom buffer
-                ],
+                ),
               ),
+              _SmallChip(icon: item.icon, label: item.tag, color: item.color),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            item.title,
+            style: const TextStyle(
+              color: _ReportsScreenState._text,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
             ),
-            
-            // 🎙️ Voice Recording Pulsing HUD
-            if (_isRecordingVoice)
-              Positioned.fill(
-                child: Container(
-                  color: Colors.black54,
-                  child: Center(
-                    child: Container(
-                      width: 240,
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1E1B4B),
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.mic_rounded, color: Colors.red, size: 42),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'Recording Audio Signal...',
-                            style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '00:0$_secondsRecorded',
-                            style: const TextStyle(color: Colors.tealAccent, fontSize: 18, fontWeight: FontWeight.w900),
-                          ),
-                          const SizedBox(height: 20),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                            onPressed: _stopVoiceRecording,
-                            child: const Text('Stop', style: TextStyle(color: Colors.white)),
-                          ),
-                        ],
-                      ),
-                    ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            item.body,
+            style: const TextStyle(
+              color: _ReportsScreenState._muted,
+              fontSize: 12,
+              height: 1.35,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            height: 132,
+            decoration: BoxDecoration(
+              color: item.color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: item.color.withValues(alpha: 0.14)),
+            ),
+            child: Stack(
+              children: [
+                Positioned(
+                  left: 18,
+                  top: 18,
+                  child: Icon(
+                    item.icon,
+                    color: item.color.withValues(alpha: 0.35),
+                    size: 48,
                   ),
                 ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMediaBtn(IconData icon, VoidCallback onTap, bool isAttached, {bool isBlue = false}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: 46, height: 46,
-            decoration: BoxDecoration(
-              color: isBlue ? const Color(0xFFEEF2FF) : Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: isAttached 
-                    ? const Color(0xFF4F46E5) 
-                    : (isBlue ? Colors.transparent : const Color(0xFFE2E8F0)),
-                width: 1.2,
-              ),
-            ),
-            child: Icon(
-              icon,
-              color: isAttached 
-                  ? const Color(0xFF4F46E5) 
-                  : (isBlue ? const Color(0xFF4F46E5) : const Color(0xFF64748B)),
-              size: 20,
-            ),
-          ),
-          if (isAttached)
-            Positioned(
-              top: -3,
-              right: -3,
-              child: Container(
-                width: 10, height: 10,
-                decoration: const BoxDecoration(
-                  color: Colors.green,
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCrisisChip(String label, IconData icon, {bool isOutline = false}) {
-    final isActive = _selectedType == label;
-    return GestureDetector(
-      onTap: () => _onChipSelected(label),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white, // In screenshot, even active chips have white backgrounds
-
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: isActive ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0),
-            width: isOutline ? 0 : 1.2,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 14,
-              color: isActive 
-                  ? const Color(0xFF4F46E5) 
-                  : (isOutline ? const Color(0xFF94A3B8) : const Color(0xFF0F172A)),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    color: isActive 
-                        ? const Color(0xFF4F46E5) 
-                        : (isOutline ? const Color(0xFF94A3B8) : const Color(0xFF0F172A)),
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.bold,
+                Positioned(
+                  right: 14,
+                  top: 14,
+                  child: _SmallChip(
+                    icon: Icons.location_on_rounded,
+                    label: item.location,
+                    color: item.color,
                   ),
                 ),
-              ),
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  bottom: 14,
+                  child: Row(
+                    children: [
+                      _SmallChip(
+                        icon: Icons.sensors_rounded,
+                        label: 'Signal matched',
+                        color: item.color,
+                      ),
+                      const SizedBox(width: 8),
+                      _SmallChip(
+                        icon: Icons.shield_rounded,
+                        label: 'CIRO review',
+                        color: _ReportsScreenState._brand,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatusPill(IconData icon, String label, String value, Color color, Color bg) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white, width: 1.5),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 14, color: Colors.white),
           ),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 12),
+          Row(
             children: [
-              Text(
-                label,
-                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.bold),
+              _PostAction(
+                icon: _liked
+                    ? Icons.favorite_rounded
+                    : Icons.favorite_border_rounded,
+                label: '$_likes',
+                active: _liked,
+                color: const Color(0xFFEF4444),
+                onTap: () {
+                  setState(() {
+                    _liked = !_liked;
+                    _likes += _liked ? 1 : -1;
+                  });
+                },
               ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: TextStyle(color: color, fontSize: 11.5, fontWeight: FontWeight.w900),
+              const SizedBox(width: 10),
+              _PostAction(
+                icon: Icons.chat_bubble_outline_rounded,
+                label: '$_comments',
+                color: _ReportsScreenState._brand,
+                onTap: _openComments,
               ),
+              const SizedBox(width: 10),
+              _PostAction(
+                icon: Icons.repeat_rounded,
+                label: '$_shares',
+                color: const Color(0xFF10B981),
+                onTap: () => setState(() => _shares++),
+              ),
+              const Spacer(),
+              const _FeedMetric(icon: Icons.visibility_outlined, label: '1.8k'),
             ],
           ),
         ],
       ),
     );
   }
+
+  void _openComments() {
+    final controller = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheet) {
+          return SafeArea(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                18,
+                14,
+                18,
+                18 + MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: _ReportsScreenState._border,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Comments',
+                    style: TextStyle(
+                      color: _ReportsScreenState._text,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _CommentRow(
+                    name: 'CIRO verifier',
+                    text:
+                        'Report is being checked against other local signals.',
+                    color: widget.item.color,
+                  ),
+                  _CommentRow(
+                    name: 'Nearby resident',
+                    text:
+                        'This matches what we are seeing from the service road.',
+                    color: widget.item.color,
+                  ),
+                  ..._localComments.map(
+                    (text) => _CommentRow(
+                      name: 'You',
+                      text: text,
+                      color: _ReportsScreenState._brand,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: controller,
+                          decoration: InputDecoration(
+                            hintText: 'Add a helpful update',
+                            filled: true,
+                            fillColor: const Color(0xFFF8FAFC),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: const BorderSide(
+                                color: _ReportsScreenState._border,
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: const BorderSide(
+                                color: _ReportsScreenState._border,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Material(
+                        color: _ReportsScreenState._brand,
+                        borderRadius: BorderRadius.circular(16),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () {
+                            final text = controller.text.trim();
+                            if (text.isEmpty) return;
+                            setState(() {
+                              _localComments.add(text);
+                              _comments++;
+                            });
+                            setSheet(() {});
+                            controller.clear();
+                          },
+                          child: const SizedBox(
+                            width: 48,
+                            height: 48,
+                            child: Icon(
+                              Icons.send_rounded,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
 
-// Model helper to cleanly encapsulate preloaded classification configurations
+class _ComposerTool extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _ComposerTool({
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: active
+              ? _ReportsScreenState._brand.withValues(alpha: 0.10)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: active
+                ? _ReportsScreenState._brand
+                : _ReportsScreenState._border,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 15,
+              color: active
+                  ? _ReportsScreenState._brand
+                  : _ReportsScreenState._muted,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                color: active
+                    ? _ReportsScreenState._brand
+                    : _ReportsScreenState._text,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PostAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _PostAction({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+    this.active = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final display = active ? color : _ReportsScreenState._muted;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: active
+              ? color.withValues(alpha: 0.10)
+              : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: active
+                ? color.withValues(alpha: 0.20)
+                : _ReportsScreenState._border,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 15, color: display),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                color: display,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SmallChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _SmallChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 190),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeedMetric extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _FeedMetric({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: const Color(0xFF94A3B8)),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF94A3B8),
+            fontSize: 10.5,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CommentRow extends StatelessWidget {
+  final String name;
+  final String text;
+  final Color color;
+
+  const _CommentRow({
+    required this.name,
+    required this.text,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _ReportsScreenState._border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 14,
+            backgroundColor: color.withValues(alpha: 0.12),
+            child: Icon(Icons.person_rounded, size: 15, color: color),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    color: _ReportsScreenState._text,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  text,
+                  style: const TextStyle(
+                    color: _ReportsScreenState._muted,
+                    fontSize: 11.5,
+                    height: 1.3,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IconCircle extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _IconCircle({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      shape: const CircleBorder(),
+      elevation: 2,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 38,
+          height: 38,
+          child: Icon(icon, color: _ReportsScreenState._text, size: 20),
+        ),
+      ),
+    );
+  }
+}
+
+BoxDecoration _box(double radius) => BoxDecoration(
+  color: Colors.white,
+  borderRadius: BorderRadius.circular(radius),
+  border: Border.all(color: _ReportsScreenState._border),
+  boxShadow: [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.025),
+      blurRadius: 14,
+      offset: const Offset(0, 4),
+    ),
+  ],
+);
+
 class _CrisisTemplate {
-  final String complaint;
   final String title;
+  final String prompt;
   final String location;
   final double lat;
   final double lng;
-  final String confidence;
-  final String action;
-  final Color severityColor;
+  final Color color;
   final IconData icon;
-  final IconData chipIcon;
 
-  _CrisisTemplate({
-    required this.complaint,
+  const _CrisisTemplate({
     required this.title,
+    required this.prompt,
     required this.location,
     required this.lat,
     required this.lng,
-    required this.confidence,
-    required this.action,
-    required this.severityColor,
+    required this.color,
     required this.icon,
-    required this.chipIcon,
   });
 }
+
+class _FeedItem {
+  final String author;
+  final String handle;
+  final String time;
+  final String title;
+  final String body;
+  final String location;
+  final String tag;
+  final IconData icon;
+  final Color color;
+  final int likes;
+  final int comments;
+  final int shares;
+
+  const _FeedItem({
+    required this.author,
+    required this.handle,
+    required this.time,
+    required this.title,
+    required this.body,
+    required this.location,
+    required this.tag,
+    required this.icon,
+    required this.color,
+    required this.likes,
+    required this.comments,
+    required this.shares,
+  });
+}
+
+List<_FeedItem> _seedFeed() => const [
+  _FeedItem(
+    author: 'Ayesha Khan',
+    handle: '@g10_resident',
+    time: '4m',
+    title: 'Water rising near G-10 Markaz',
+    body:
+        'Rainwater is collecting near the market edge. Smaller cars are slowing down and shop entrances are getting wet.',
+    location: 'G-10 Markaz',
+    tag: 'Verified',
+    icon: Icons.water_drop_rounded,
+    color: Color(0xFF2563EB),
+    likes: 42,
+    comments: 8,
+    shares: 12,
+  ),
+  _FeedItem(
+    author: 'Traffic Warden Unit',
+    handle: '@ict_traffic',
+    time: '8m',
+    title: 'Slow traffic on service road',
+    body:
+        'Three nearby road segments are moving below normal speed. Drivers should avoid the service road beside G-10/2.',
+    location: 'Service Road West',
+    tag: 'Traffic',
+    icon: Icons.traffic_rounded,
+    color: Color(0xFFF97316),
+    likes: 31,
+    comments: 6,
+    shares: 18,
+  ),
+  _FeedItem(
+    author: 'Relief Desk',
+    handle: '@ciro_relief',
+    time: '12m',
+    title: 'Shelter intake ready',
+    body:
+        'G-10 Community Center can receive families if water enters homes. Basic meals and first aid are available.',
+    location: 'G-10 Community Center',
+    tag: 'Ready',
+    icon: Icons.home_work_rounded,
+    color: Color(0xFF10B981),
+    likes: 28,
+    comments: 4,
+    shares: 9,
+  ),
+  _FeedItem(
+    author: 'PIMS Emergency Desk',
+    handle: '@pims_intake',
+    time: '15m',
+    title: 'Triage capacity checked',
+    body:
+        'Emergency wing is ready for minor injuries and exposure cases from nearby flooded lanes.',
+    location: 'PIMS',
+    tag: 'Hospital',
+    icon: Icons.local_hospital_rounded,
+    color: Color(0xFF0EA5E9),
+    likes: 24,
+    comments: 5,
+    shares: 7,
+  ),
+  _FeedItem(
+    author: 'Field Team 3',
+    handle: '@field_ops',
+    time: '18m',
+    title: 'Drainage crew requested',
+    body:
+        'Standing water reported near the market edge. Utility team asked to inspect a possible drain blockage.',
+    location: 'G-10/2',
+    tag: 'Action',
+    icon: Icons.construction_rounded,
+    color: Color(0xFF8B5CF6),
+    likes: 19,
+    comments: 3,
+    shares: 6,
+  ),
+];

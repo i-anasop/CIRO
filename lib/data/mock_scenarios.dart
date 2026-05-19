@@ -6,6 +6,7 @@
 import '../models/demo_scenario.dart';
 import '../models/crisis.dart';
 import '../models/signal.dart';
+import '../models/orchestration_models.dart';
 
 final List<DemoScenario> mockDemoScenarios = [
 
@@ -239,101 +240,99 @@ final List<DemoScenario> mockDemoScenarios = [
     ],
   ),
 
-  // ── Scenario 3: Heatwave — Saddar, Rawalpindi ───────────────────────────
+  // ── Scenario 3: Torrential Rain — Saddar, Rawalpindi ─────────────────────
   const DemoScenario(
     id: 'SCN-003',
-    title: 'Heatwave Advisory — Saddar, Rawalpindi',
-    crisisType: CrisisType.heatwave,
+    title: 'Torrential Rain & Canal Inundation — Saddar, Rawalpindi',
+    crisisType: CrisisType.urbanFlooding,
     location: 'Saddar, Rawalpindi',
     coordinates: '33.5996°N, 73.0479°E',
     severity: SeverityLevel.high,
     confidence: 82,
     status: CrisisStatus.active,
     affectedPopulation: 5500,
-    expectedDuration: '2–4 days',
+    expectedDuration: '4–8 hours',
     likelyEvolution:
-        'Extreme heat advisory at 47°C. Risk of mass heat stroke, '
-        'hospital surge, and outdoor worker fatalities. '
-        'Urban heat island effect amplifies risk in dense Saddar areas.',
+        'Torrential rain causing Leh Nullah canal overflow. Risk of low-lying area '
+        'inundation, power failures, and commercial damage in Saddar markets.',
     mapZoneLabel: 'Saddar — Rawalpindi',
-    resourceSummary: '3 medical teams, 5 water stations, 2 hospitals on standby',
+    resourceSummary: '2 rescue teams, 4 dewatering pumps, 3 traffic units standby',
     resourceUnits: [
-      'Medical Team MT-01',
-      'Medical Team MT-02',
-      'Water Station WS-04',
-      'Water Station WS-07',
-      'Benazir Bhutto Hospital — Trauma Wing',
+      'Rescue Team RT-01',
+      'Rescue Team RT-02',
+      'Dewatering Pump DP-04',
+      'Dewatering Pump DP-07',
+      'Rawalpindi Drainage Coordinator',
     ],
     socialSignal: SignalInput(
       source: SignalSource.socialPost,
-      content: '"Bohat zyada garmi hai, log behosh ho rahe hain Saddar mein, '
-          'kuch logon ko hospital ley gaye" — @saddar_news · 13:05 PKT',
+      content: '"Bohat zyada tez baarish ho rahi hai Saddar mein, Leh Nullah ka '
+          'pani road par aa gaya hai" — @saddar_news · 13:05 PKT',
       confidence: 0.80,
     ),
     weatherSignal: SignalInput(
       source: SignalSource.weatherAlert,
-      content: 'Extreme Heat Advisory — Rawalpindi — Temp: 47°C — '
-          'Heat index: 52°C — NDMA advisory level RED — Issued 12:00 PKT',
+      content: 'Torrential Rainfall Advisory — Rawalpindi — Temp: 22°C — '
+          'Cumulative rain: 85mm — PMD alert level RED — Issued 12:00 PKT',
       confidence: 0.97,
     ),
     trafficSignal: SignalInput(
       source: SignalSource.trafficData,
-      content: 'Traffic: Normal — No congestion anomalies detected',
-      confidence: 0.70,
-      isActive: false,
+      content: 'Traffic: Standstill at Committee Chowk and Murree Road detour lanes',
+      confidence: 0.88,
     ),
     extraSignals: [
       SignalInput(
         source: SignalSource.mockSensor,
-        content: 'Temp sensor SADDAR-T-02: 47.3°C — above 45°C threshold since 11:30 PKT',
+        content: 'Nullah Leh sensor SADDAR-WL-02: +1.8m above warning line since 11:30 PKT',
         confidence: 0.99,
       ),
     ],
     verificationType: VerificationType.confirmed,
     verificationNote:
-        'Weather advisory and sensor data both confirm extreme heat. '
-        'Social reports of casualties match expected heatwave impact. '
-        'Traffic is unaffected — crisis is health-only. Full response warranted.',
+        'PMD weather radar and Nullah Leh sensors confirm critical canal overflow. '
+        'Social reports corroborate extensive street flooding. Full emergency '
+        'evacuation and drainage response initiated.',
     responseActions: [
       PlanAction(
         step: 1,
-        title: 'Set Up 5 Emergency Water/Cooling Stations',
-        description: 'Deploy water distribution and cooling stations at '
-            'Saddar market, Committee Chowk, and main bus terminal.',
+        title: 'Deploy Dewatering Pumps to Saddar Markets',
+        description: 'Deploy WASA water extraction pumps to Saddar commercial centers, '
+            'Committee Chowk, and low-lying transit junctions.',
         department: 'WASA · Rawalpindi Metropolitan',
         priority: 'P1',
         eta: '15 min',
         status: 'In Progress',
-        resultSummary: '3 of 5 stations deployed. 2 en route.',
+        resultSummary: '3 of 4 pumps active. Restricting canal return backflow.',
       ),
       PlanAction(
         step: 2,
-        title: 'Alert Hospitals for Heat Stroke Surge',
-        description: 'Notify Benazir Bhutto Hospital and Holy Family Hospital '
-            'to activate surge protocol and allocate heat-stroke beds.',
-        department: 'Health Department · Punjab',
+        title: 'Alert Saddar Low-Lying Sectors to Evacuate',
+        description: 'Establish evacuation pathways and temporary holding camps '
+            'at higher elevation spots.',
+        department: 'Civil Defense · Rawalpindi',
         priority: 'P1',
         eta: '5 min',
         status: 'Completed',
-        resultSummary: '24 beds allocated. Trauma teams on standby.',
+        resultSummary: '450 families evacuated to secure community centers.',
       ),
       PlanAction(
         step: 3,
-        title: 'Broadcast Heat Advisory to Residents',
-        description: 'Issue emergency health advisory: avoid outdoor activity, '
-            'hydration guidelines, emergency helpline 1122.',
+        title: 'Broadcast Localized Canal Flood Alert',
+        description: 'Issue emergency safety warnings advising immediate second-floor '
+            'relocation, electricity shutoffs, and coordinate with 1122.',
         department: 'PSCA · Emergency Broadcast',
         priority: 'P2',
         eta: '5 min',
         status: 'Completed',
-        resultSummary: '5,500 alerts sent. Health advisory broadcast on FM.',
+        resultSummary: '5,500 alerts broadcasted. Canal evacuation signs active.',
       ),
       PlanAction(
         step: 4,
-        title: 'Deploy Mobile Medical Teams',
-        description: 'Dispatch 3 mobile medical teams for outdoor heat stroke '
-            'case identification and treatment.',
-        department: 'Rescue 1122 · Rawalpindi',
+        title: 'Dispatch Rescue Boats for Stranded Residents',
+        description: 'Mobilize 2 rescue teams and 6 personnel to evacuate stranded '
+            'shopkeepers and shoppers from submersed markets.',
+        department: 'Rescue 1122 · Saddar Station',
         priority: 'P2',
         eta: '20 min',
         status: 'Pending',
@@ -342,15 +341,15 @@ final List<DemoScenario> mockDemoScenarios = [
     ],
     simulationMetrics: [
       MetricPair(label: 'At-Risk Population',  before: '5,500',  after: '1,200',   delta: '▼ 4,300',    isImprovement: true),
-      MetricPair(label: 'Hospital Capacity',    before: '0 beds', after: '24 beds', delta: '▲ +24',      isImprovement: true),
-      MetricPair(label: 'Water Access',         before: '0 pts',  after: '5 pts',   delta: '▲ +5',       isImprovement: true),
-      MetricPair(label: 'Risk Level',           before: 'High',   after: 'Moderate',delta: '▼ -1',       isImprovement: true),
-      MetricPair(label: 'Medical Units',        before: '0',      after: '3 teams', delta: '▲ +3',       isImprovement: true),
+      MetricPair(label: 'Evacuated Families',  before: '0 families', after: '450 families', delta: '▲ +450', isImprovement: true),
+      MetricPair(label: 'Dewatered Volume',    before: '0 L/m',  after: '6,000 L/m', delta: '▲ +6k',     isImprovement: true),
+      MetricPair(label: 'Risk Level',           before: 'Critical', after: 'Moderate',delta: '▼ -2',     isImprovement: true),
+      MetricPair(label: 'Rescue Teams',        before: '0',      after: '2 teams', delta: '▲ +2',       isImprovement: true),
       MetricPair(label: 'Alerts Sent',          before: '0',      after: '5,500',   delta: '▲ 5,500',    isImprovement: true),
     ],
     possibleSideEffects: [
-      'Hospital surge may impact non-emergency care availability',
-      'Water station deployment may require road closures in busy zones',
+      'Evacuation flow may restrict commuter movement on Murree Road detour links',
+      'High silt levels in Leh Nullah may reduce water pumping turbine efficiency',
     ],
   ),
 
@@ -570,6 +569,488 @@ final List<DemoScenario> mockDemoScenarios = [
     possibleSideEffects: [
       'Khayaban-e-Suharwardy may see 20% congestion increase during diversion',
     ],
+  ),
+
+  // Scenario 6: Multi-crisis resource trade-off demo
+  const DemoScenario(
+    id: 'SCN-006',
+    title: 'Multi-Crisis Coordination - Flood + Heat Emergency',
+    crisisType: CrisisType.urbanFlooding,
+    location: 'G-10 and I-10, Islamabad',
+    coordinates: '33.6946N, 73.0179E',
+    severity: SeverityLevel.critical,
+    confidence: 89,
+    status: CrisisStatus.active,
+    affectedPopulation: 6900,
+    expectedDuration: '4-8 hours',
+    likelyEvolution:
+        'Flooding in G-10 will spread traffic pressure toward I-10 while a nearby heat emergency raises medical demand. Shared ambulances and field teams must be split carefully.',
+    mapZoneLabel: 'G-10 / I-10 coordination zone',
+    resourceSummary:
+        'Constrained pool: 2 rescue boats, 2 ambulances, 1 pumping unit, 2 medical teams, 3 traffic units',
+    resourceUnits: [
+      'Rescue Boat RB-04',
+      'Rescue Boat RB-07',
+      'Pumping Unit PU-02',
+      'Ambulance AMB-12',
+      'Ambulance AMB-18',
+      'Medical Team MT-05',
+      'Traffic Unit TU-03',
+    ],
+    socialSignal: SignalInput(
+      source: SignalSource.socialPost,
+      content:
+          'Multiple citizen posts: G-10 lanes flooded while I-10 low-income blocks report heat exhaustion cases.',
+      confidence: 0.82,
+    ),
+    weatherSignal: SignalInput(
+      source: SignalSource.weatherAlert,
+      content:
+          'PMD dual advisory: heavy rain cells over G-10 plus heat index 45C across I-10 industrial belt.',
+      confidence: 0.93,
+    ),
+    trafficSignal: SignalInput(
+      source: SignalSource.trafficData,
+      content:
+          'Traffic API: 88% congestion in G-10, 52% detour load toward I-10 medical corridor.',
+      confidence: 0.90,
+    ),
+    extraSignals: [
+      SignalInput(
+        source: SignalSource.emergencyCall,
+        content:
+            '1122 call frequency doubled in 20 minutes: stranded vehicles and heat illness requests competing for ambulances.',
+        confidence: 0.86,
+      ),
+    ],
+    verificationType: VerificationType.confirmed,
+    verificationNote:
+        'Four source families agree that two incidents are active. CIRO prioritizes flood rescue for immediate life safety while reserving one ambulance and one medical team for heat cases.',
+    responseActions: [
+      PlanAction(
+        step: 1,
+        title: 'Prioritize G-10 Flood Rescue',
+        description:
+            'Assign both rescue boats and one pump to flooded lanes while keeping medical corridor open.',
+        department: 'Rescue 1122 / CDA Drainage',
+        priority: 'P1',
+        eta: '8 min',
+        status: 'In Progress',
+        resultSummary: 'Water rescue resources assigned; pump team dispatched.',
+      ),
+      PlanAction(
+        step: 2,
+        title: 'Reserve Ambulance for I-10 Heat Emergency',
+        description:
+            'Hold one ambulance and one medical team for heatstroke triage instead of sending all medical units to G-10.',
+        department: 'Health Department',
+        priority: 'P1',
+        eta: '10 min',
+        status: 'Completed',
+        resultSummary: 'Medical reserve protected for I-10.',
+      ),
+      PlanAction(
+        step: 3,
+        title: 'Stage Public Alerts by Sector',
+        description:
+            'Send flood alerts to G-10 first, then heat advisory to I-10 to prevent simultaneous evacuation congestion.',
+        department: 'PSCA Broadcast',
+        priority: 'P2',
+        eta: '5 min',
+        status: 'Completed',
+        resultSummary: 'Staged alerting reduced detour overload.',
+      ),
+      PlanAction(
+        step: 4,
+        title: 'Open Hospital Prep Channel',
+        description:
+            'Notify PIMS and nearby clinics to split beds between trauma, hypothermia, and heatstroke intake.',
+        department: 'Hospital Coordination Cell',
+        priority: 'P2',
+        eta: '7 min',
+        status: 'Completed',
+      ),
+    ],
+    simulationMetrics: [
+      MetricPair(label: 'Flood Response Time', before: '20 min', after: '8 min', delta: 'down 12 min', isImprovement: true),
+      MetricPair(label: 'Heat Triage Capacity', before: '0 teams', after: '1 team', delta: 'up 1', isImprovement: true),
+      MetricPair(label: 'Congestion Spillover', before: '52%', after: '31%', delta: 'down 21%', isImprovement: true),
+      MetricPair(label: 'Uncovered Incidents', before: '1', after: '0', delta: 'down 1', isImprovement: true),
+    ],
+    possibleSideEffects: [
+      'Flood rescue receives fewer ambulances than ideal because one unit is reserved for heat cases',
+      'Staged alerts delay some non-critical public messaging by five minutes',
+    ],
+    orchestration: ScenarioOrchestrationHints(
+      resourceConstraint:
+          'Only 2 ambulances and 2 field medical teams available across two simultaneous incidents.',
+      affectedRadius: '3.8 km combined corridor',
+      peakImpactTime: '45 min',
+      spreadRisk: 'High: flood detours can overload the I-10 medical corridor.',
+      uncertaintyRange: '+/- 18%',
+      relatedIncidents: [
+        RelatedIncident(
+          title: 'Heat Emergency - I-10 low-income blocks',
+          type: CrisisType.heatwave,
+          location: 'I-10, Islamabad',
+          severity: SeverityLevel.high,
+          affectedPopulation: 3700,
+          confidence: 84,
+          coordinationNeed:
+              'Protect ambulance and medical team capacity while flood rescue consumes mobility resources.',
+        ),
+      ],
+      resourceTradeOffs: [
+        'AMB-18 reserved for heatstroke instead of flood evacuation.',
+        'Traffic units prioritize ambulance corridor before general commuter relief.',
+        'Public alerts are staged to avoid evacuation surge on the same detour route.',
+      ],
+      stakeholderMessages: {
+        'Public':
+            'G-10 residents avoid flooded roads; I-10 residents follow heat advisory and use cooling points.',
+        'Hospitals':
+            'Prepare split surge: water rescue injuries plus heatstroke triage expected within 45 minutes.',
+      },
+    ),
+  ),
+
+  // Scenario 7: Conflicting signals demo
+  const DemoScenario(
+    id: 'SCN-007',
+    title: 'Conflicting Signals - Flood Report vs Water Main',
+    crisisType: CrisisType.urbanFlooding,
+    location: 'G-10 Markaz, Islamabad',
+    coordinates: '33.6946N, 73.0179E',
+    severity: SeverityLevel.moderate,
+    confidence: 61,
+    status: CrisisStatus.needsVerification,
+    affectedPopulation: 900,
+    expectedDuration: '1-2 hours',
+    likelyEvolution:
+        'If the field report is correct, the event is a localized water-main burst. If rainfall resumes, low-lying roads may still flood.',
+    mapZoneLabel: 'G-10 verification zone',
+    resourceSummary:
+        '1 field verification team, 1 utility crew, traffic warden standby',
+    resourceUnits: [
+      'Field Team FT-02',
+      'CDA Water Crew WC-05',
+      'Traffic Warden TW-08',
+    ],
+    socialSignal: SignalInput(
+      source: SignalSource.socialPost,
+      content:
+          'Citizen posts say G-10 is flooded and vehicles are slowing near Markaz.',
+      confidence: 0.72,
+    ),
+    weatherSignal: SignalInput(
+      source: SignalSource.weatherAlert,
+      content:
+          'Weather radar: rain has stopped; no active heavy rainfall cell over G-10.',
+      confidence: 0.88,
+    ),
+    trafficSignal: SignalInput(
+      source: SignalSource.trafficData,
+      content:
+          'Traffic API: moderate congestion, no full route closure detected.',
+      confidence: 0.79,
+    ),
+    extraSignals: [
+      SignalInput(
+        source: SignalSource.fieldReport,
+        content:
+            'Responder report: visible water source appears to be a broken main, not area-wide flooding.',
+        confidence: 0.91,
+      ),
+    ],
+    verificationType: VerificationType.conflictingSignals,
+    verificationNote:
+        'Social reports indicate flooding, but weather and traffic are below flood thresholds and field report suggests a water-main burst. CIRO holds public flood alert and escalates utility verification.',
+    responseActions: [
+      PlanAction(
+        step: 1,
+        title: 'Hold Full Flood Alert',
+        description:
+            'Prevent panic messaging until field verification confirms crisis type.',
+        department: 'Command Center',
+        priority: 'P1',
+        eta: 'Immediate',
+        status: 'Completed',
+        resultSummary: 'Flood broadcast paused pending verification.',
+      ),
+      PlanAction(
+        step: 2,
+        title: 'Dispatch CDA Water Crew',
+        description:
+            'Verify suspected broken water main and isolate valve if confirmed.',
+        department: 'CDA Water Utility',
+        priority: 'P1',
+        eta: '9 min',
+        status: 'In Progress',
+      ),
+      PlanAction(
+        step: 3,
+        title: 'Monitor Traffic Escalation',
+        description:
+            'Keep one warden on standby and trigger reroute only if congestion exceeds 75%.',
+        department: 'Traffic Police',
+        priority: 'P2',
+        eta: 'Ongoing',
+        status: 'Pending',
+      ),
+    ],
+    simulationMetrics: [
+      MetricPair(label: 'False Alert Risk', before: 'High', after: 'Low', delta: 'down', isImprovement: true),
+      MetricPair(label: 'Verification ETA', before: '25 min', after: '9 min', delta: 'down 16 min', isImprovement: true),
+      MetricPair(label: 'Resource Cost', before: '6 units', after: '3 units', delta: 'down 3', isImprovement: true),
+    ],
+    possibleSideEffects: [
+      'Holding the public alert may delay warning if rainfall suddenly resumes',
+    ],
+    orchestration: ScenarioOrchestrationHints(
+      resourceConstraint:
+          'Do not consume flood rescue assets until field report resolves the contradiction.',
+      affectedRadius: '0.8 km',
+      peakImpactTime: 'Unknown pending verification',
+      spreadRisk: 'Low-to-moderate, depends on valve isolation and rainfall return.',
+      uncertaintyRange: '+/- 30%',
+      resourceTradeOffs: [
+        'Utility crew dispatched before rescue boats to reduce false positive cost.',
+        'Traffic reroute remains standby to avoid unnecessary congestion.',
+      ],
+      stakeholderMessages: {
+        'Public':
+            'Localized water disruption under verification near G-10 Markaz. Avoid the immediate lane; no evacuation order issued.',
+        'Utilities':
+            'Urgent field verification requested for suspected water-main burst at G-10 Markaz.',
+      },
+    ),
+  ),
+
+  // Scenario 8: False positive recovery demo
+  const DemoScenario(
+    id: 'SCN-008',
+    title: 'False Positive Recovery - Flood Alert Retracted',
+    crisisType: CrisisType.urbanFlooding,
+    location: 'F-11 Underpass, Islamabad',
+    coordinates: '33.6844N, 72.9882E',
+    severity: SeverityLevel.low,
+    confidence: 42,
+    status: CrisisStatus.resolved,
+    affectedPopulation: 120,
+    expectedDuration: 'Resolved',
+    likelyEvolution:
+        'No crisis evolution expected. Image repost and stale traffic report caused an early false flood classification.',
+    mapZoneLabel: 'F-11 resolved alert',
+    resourceSummary: 'No emergency dispatch; alert correction and log update only',
+    resourceUnits: [
+      'Verification Desk VD-01',
+      'Public Information Officer PIO-02',
+    ],
+    socialSignal: SignalInput(
+      source: SignalSource.socialPost,
+      content:
+          'Viral image claims F-11 underpass is flooded, but metadata is from last monsoon season.',
+      confidence: 0.38,
+    ),
+    weatherSignal: SignalInput(
+      source: SignalSource.weatherAlert,
+      content: 'Weather API: clear skies, 0mm rainfall in the last hour.',
+      confidence: 0.96,
+    ),
+    trafficSignal: SignalInput(
+      source: SignalSource.trafficData,
+      content: 'Traffic API: normal flow, no closure, no congestion spike.',
+      confidence: 0.93,
+    ),
+    extraSignals: [
+      SignalInput(
+        source: SignalSource.fieldReport,
+        content:
+            'Field team confirms the underpass is dry. Original image was stale.',
+        confidence: 0.98,
+      ),
+    ],
+    verificationType: VerificationType.falsePositiveRisk,
+    verificationNote:
+        'CIRO recovered from a low-confidence flood rumor. Official weather, traffic, and field verification contradict the viral post. Public correction issued and model log updated.',
+    responseActions: [
+      PlanAction(
+        step: 1,
+        title: 'Retract Draft Flood Alert',
+        description:
+            'Cancel pending public flood alert before it reaches broadcast queue.',
+        department: 'PSCA Broadcast',
+        priority: 'P1',
+        eta: 'Immediate',
+        status: 'Completed',
+        resultSummary: 'Alert cancelled before mass delivery.',
+      ),
+      PlanAction(
+        step: 2,
+        title: 'Issue Public Correction',
+        description:
+            'Publish correction that the F-11 image is stale and no flood response is active.',
+        department: 'Media Cell',
+        priority: 'P2',
+        eta: '4 min',
+        status: 'Completed',
+        resultSummary: 'Correction sent to app feed and command center.',
+      ),
+      PlanAction(
+        step: 3,
+        title: 'Update Misinformation Signature',
+        description:
+            'Flag reposted media pattern for lower credibility in future flood detections.',
+        department: 'Verification Agent',
+        priority: 'P3',
+        eta: '2 min',
+        status: 'Completed',
+      ),
+    ],
+    simulationMetrics: [
+      MetricPair(label: 'False Dispatches', before: '4 units', after: '0 units', delta: 'down 4', isImprovement: true),
+      MetricPair(label: 'Public Confusion', before: 'High', after: 'Low', delta: 'down', isImprovement: true),
+      MetricPair(label: 'Resource Waste', before: 'High', after: 'None', delta: 'down', isImprovement: true),
+    ],
+    possibleSideEffects: [
+      'Correction must be worded carefully to preserve trust for future alerts',
+    ],
+    orchestration: ScenarioOrchestrationHints(
+      resourceConstraint:
+          'Emergency units remain available because verification blocks false dispatch.',
+      affectedRadius: '0 km confirmed',
+      peakImpactTime: 'No peak impact',
+      spreadRisk: 'Misinformation spread risk only.',
+      uncertaintyRange: '+/- 8%',
+      resourceTradeOffs: [
+        'No rescue resources assigned; verification and media correction only.',
+      ],
+      stakeholderMessages: {
+        'Public':
+            'Correction: no active flood at F-11 underpass. Earlier image was stale. Continue normal travel with caution.',
+        'Media/Command Center':
+            'Retract flood mention and cite verified field report plus weather/traffic contradiction.',
+      },
+    ),
+  ),
+
+  // Scenario 9: False negative escalation demo
+  const DemoScenario(
+    id: 'SCN-009',
+    title: 'False Negative Escalation - Outage Becomes Critical',
+    crisisType: CrisisType.powerOutage,
+    location: 'I-9 Industrial Area, Islamabad',
+    coordinates: '33.6647N, 73.0551E',
+    severity: SeverityLevel.high,
+    confidence: 81,
+    status: CrisisStatus.active,
+    affectedPopulation: 4300,
+    expectedDuration: '3-6 hours',
+    likelyEvolution:
+        'Initial sparse outage complaints were under-rated. Sensor and hospital generator alerts now indicate a critical infrastructure risk.',
+    mapZoneLabel: 'I-9 escalation zone',
+    resourceSummary:
+        'Utility repair crew, mobile generator, police support for dark intersections',
+    resourceUnits: [
+      'IESCO Repair Crew RC-06',
+      'Generator Unit GEN-05',
+      'Police Mobile PM-09',
+      'Field Team FT-09',
+    ],
+    socialSignal: SignalInput(
+      source: SignalSource.socialPost,
+      content:
+          'Early posts said "lights are flickering" and were initially below alert threshold.',
+      confidence: 0.55,
+    ),
+    weatherSignal: SignalInput(
+      source: SignalSource.weatherAlert,
+      content: 'Weather: clear. No storm cause detected for outage.',
+      confidence: 0.82,
+      isActive: false,
+    ),
+    trafficSignal: SignalInput(
+      source: SignalSource.trafficData,
+      content:
+          'Traffic signal outages causing growing congestion at I-9 industrial intersections.',
+      confidence: 0.83,
+    ),
+    extraSignals: [
+      SignalInput(
+        source: SignalSource.mockSensor,
+        content:
+            'Grid sensor: feeder voltage dropped to 0V across I-9/3 and hospital backup line unstable.',
+        confidence: 0.97,
+      ),
+      SignalInput(
+        source: SignalSource.emergencyCall,
+        content:
+            'Hospital desk reports generator fuel reserve under 90 minutes.',
+        confidence: 0.89,
+      ),
+    ],
+    verificationType: VerificationType.escalationRequired,
+    verificationNote:
+        'False negative recovered: early social signals were weak, but later grid sensors and hospital calls push severity to High. CIRO escalates utility and generator response.',
+    responseActions: [
+      PlanAction(
+        step: 1,
+        title: 'Escalate IESCO Repair Crew',
+        description:
+            'Dispatch repair crew to feeder fault and prioritize hospital backup line.',
+        department: 'IESCO Grid Operations',
+        priority: 'P1',
+        eta: '12 min',
+        status: 'In Progress',
+        resultSummary: 'Repair crew accepted critical ticket.',
+      ),
+      PlanAction(
+        step: 2,
+        title: 'Deploy Mobile Generator to Clinic',
+        description:
+            'Move generator unit to the highest-risk clinic before fuel reserve drops below threshold.',
+        department: 'NDMA Utilities',
+        priority: 'P1',
+        eta: '18 min',
+        status: 'Pending',
+      ),
+      PlanAction(
+        step: 3,
+        title: 'Secure Dark Intersections',
+        description:
+            'Send police mobile to manually control traffic lights until grid restores.',
+        department: 'Traffic Police',
+        priority: 'P2',
+        eta: '8 min',
+        status: 'Completed',
+      ),
+    ],
+    simulationMetrics: [
+      MetricPair(label: 'Escalation Delay', before: '45 min', after: '12 min', delta: 'down 33 min', isImprovement: true),
+      MetricPair(label: 'Critical Sites Powered', before: '0', after: '2', delta: 'up 2', isImprovement: true),
+      MetricPair(label: 'Intersection Risk', before: 'High', after: 'Moderate', delta: 'down', isImprovement: true),
+    ],
+    possibleSideEffects: [
+      'Generator deployment leaves one shelter without backup power for 30 minutes',
+    ],
+    orchestration: ScenarioOrchestrationHints(
+      resourceConstraint:
+          'Only one mobile generator is available; critical clinic receives priority over shelter standby.',
+      affectedRadius: '2.4 km',
+      peakImpactTime: '60-90 min',
+      spreadRisk: 'High if hospital backup power is not stabilized.',
+      uncertaintyRange: '+/- 20%',
+      resourceTradeOffs: [
+        'Generator GEN-05 sent to clinic instead of shelter standby.',
+        'Police support assigned to intersections while utility crew repairs feeder.',
+      ],
+      stakeholderMessages: {
+        'Hospitals':
+            'Activate generator conservation mode. Mobile generator ETA 18 minutes.',
+        'Utilities':
+            'Critical feeder outage escalation: prioritize I-9/3 and clinic backup line.',
+      },
+    ),
   ),
 ];
 

@@ -57,27 +57,53 @@ final List<Crisis> mockCrises = [
     verificationState: '⚠️ Needs Verification',
   ),
 
-  // ── Tertiary Crisis: Heatwave in F-7 ─────────────────────────────────────
+  // ── Tertiary Crisis: Heavy Rainfall in F-7 / F-8 ─────────────────────────
   Crisis(
     id: 'CRS-2024-003',
-    type: CrisisType.heatwave,
-    title: 'Heatwave Advisory — F-7 / F-8 Sectors',
+    type: CrisisType.urbanFlooding,
+    title: 'Heavy Rainfall & Drainage Overflow — F-7 / F-8 Sectors',
     location: 'F-7 & F-8, Islamabad',
     coordinates: '33.7215,73.0433',
     severity: SeverityLevel.moderate,
     status: CrisisStatus.monitoring,
-    confidencePercent: 85,
-    affectedPeople: 4800,
+    confidencePercent: 88,
+    affectedPeople: 4500,
     detectedAt: DateTime(2024, 6, 15, 11, 00),
-    estimatedDuration: '3–5 days',
+    estimatedDuration: '2–4 hours',
     signalSummaries: [
-      'Weather: Temperature 44°C — Extreme Heat Advisory issued by PMD',
-      'Sensor: Heat index at F-7 monitoring station: 48°C',
+      'Weather: Heavy Rainfall Alert — Amber Category — Islamabad',
+      'Citizen Reports: 12 reports of localized drainage choke points in F-7/F-8',
+      'Sensor: F-7 rain gauge detects 48mm precipitation in 90 minutes',
     ],
     detectionReasoning:
-        'Pakistan Meteorological Department has issued an official Extreme Heat '
-        'Advisory. Sensor readings confirm heat index exceeds safe thresholds. '
-        'Vulnerable populations in open areas are at risk.',
+        'PMD Amber-category rainfall advisory active. Rain gauge detects '
+        'extreme precipitation volume (48mm). Localized drainage blocks reported '
+        'by residents. Secondary flooding risk if stormwater system overflows.',
+    verificationState: '✅ Confirmed Threat',
+  ),
+
+  // ── Quaternary Crisis: Margalla Hills Landslide ──────────────────────────
+  Crisis(
+    id: 'CRS-2024-006',
+    type: CrisisType.roadBlockage,
+    title: 'Landslide Debris Blockage — Margalla Road',
+    location: 'Margalla Hills, Islamabad',
+    coordinates: '33.7580,73.0640',
+    severity: SeverityLevel.high,
+    status: CrisisStatus.active,
+    confidencePercent: 92,
+    affectedPeople: 1200,
+    detectedAt: DateTime(2024, 6, 15, 14, 40),
+    estimatedDuration: '4–6 hours',
+    signalSummaries: [
+      'Weather: Heavy rainfall trigger (95mm cumulative over Margalla Hills)',
+      'Traffic: Margalla Road 90% congestion, full standstill near Zoo intersection',
+      'Police Reports: Rescue 1122 confirms debris slide blocking both lanes',
+    ],
+    detectionReasoning:
+        'Prolonged heavy rainfall has triggered a localized mud and rock slide '
+        'on Margalla Road. Commuter flow completely blocked. Heavy road operations '
+        'wardens dispatched for immediate clearance.',
     verificationState: '✅ Confirmed Crisis',
   ),
 

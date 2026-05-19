@@ -56,7 +56,7 @@ class _SimulationScreenState extends State<SimulationScreen>
         return Scaffold(
           backgroundColor: CiroColors.bg1,
           appBar: AppBar(
-            title: const Text('Simulation Results'),
+            title: const Text('Expected Impact'),
             leading: IconButton(
               icon: const Icon(Icons.arrow_back_rounded),
               onPressed: () =>
@@ -77,10 +77,10 @@ class _SimulationScreenState extends State<SimulationScreen>
                     const SizedBox(height: CiroSpacing.sectionSpacing),
 
                     // ── Before / After metrics ─────────────────────────────
-                    Text('Before / After Metrics',
+                    Text('Before / After',
                         style: CiroTypography.headingMedium),
                     const SizedBox(height: 4),
-                    Text('Projected outcomes after all response actions.',
+                    Text('What should improve after the response starts.',
                         style: CiroTypography.bodyMedium),
                     const SizedBox(height: CiroSpacing.md),
                     ...sim.metrics.map((m) => Padding(
@@ -96,7 +96,7 @@ class _SimulationScreenState extends State<SimulationScreen>
 
                     // ── Verification state ─────────────────────────────────
                     const SizedBox(height: CiroSpacing.sectionSpacing),
-                    Text('Verification Decision',
+                    Text('Safety Check',
                         style: CiroTypography.headingMedium),
                     const SizedBox(height: CiroSpacing.md),
                     _buildVerification(verif),
@@ -112,7 +112,7 @@ class _SimulationScreenState extends State<SimulationScreen>
 
                     // ── Simulation timeline ────────────────────────────────
                     const SizedBox(height: CiroSpacing.sectionSpacing),
-                    Text('Simulation Timeline',
+                    Text('Action Timeline',
                         style: CiroTypography.headingMedium),
                     const SizedBox(height: CiroSpacing.md),
                     ...sim.actions.asMap().entries.map((e) =>
@@ -130,7 +130,7 @@ class _SimulationScreenState extends State<SimulationScreen>
                       child: OutlinedButton.icon(
                         onPressed: () => context.go('/logs'),
                         icon: const Icon(Icons.account_tree_outlined, size: 17),
-                        label: const Text('View Full Agent Decision Trace'),
+                        label: const Text('Why CIRO Says This'),
                       ),
                     ),
                     const SizedBox(height: CiroSpacing.xxxl),
@@ -170,14 +170,14 @@ class _SimulationScreenState extends State<SimulationScreen>
                 color: CiroColors.success, size: 18),
           ),
           const SizedBox(width: CiroSpacing.sm),
-          Text('Simulation Complete',
+          Text('Impact Estimate Ready',
               style: CiroTypography.headingSmall.copyWith(
                   color: CiroColors.success)),
         ]),
         const SizedBox(height: CiroSpacing.sm),
         Text(
-          'All ${sim.actions.length} response actions simulated. '
-          '${sim.metrics.length} outcome metrics computed for ${scenario.location}.',
+          '${sim.actions.length} response actions checked. '
+          '${sim.metrics.length} expected improvements prepared for ${scenario.location}.',
           style: CiroTypography.bodyMedium,
         ),
         if (firstMetric != null) ...[
@@ -191,7 +191,7 @@ class _SimulationScreenState extends State<SimulationScreen>
                 '${widget.crisis.severityLabel} → Improving',
                 CiroColors.warning),
             const SizedBox(width: CiroSpacing.sm),
-            _miniStat('Pipeline', '9 agents', CiroColors.brandAccent),
+            _miniStat('Review', 'Ready', CiroColors.brandAccent),
           ]),
         ],
       ]),

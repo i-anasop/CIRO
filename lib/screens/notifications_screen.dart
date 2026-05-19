@@ -1,7 +1,5 @@
-// CIRO — Notifications Screen v6
-// High-fidelity, premium notifications feed matching the user's uploaded mockup design exactly.
-// Features unified layout, Left edge vertical colored urgency stripes, custom categories with dot alerts,
-// clock-timed PKT sub-rows, custom back chevron, and interactive expand/collapse animation cards.
+// CIRO - Notifications Screen
+// Clean grouped notification feed inspired by the provided reference.
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -15,408 +13,89 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  // Track expanded notification items for details dropdown
-  final Set<String> _expandedIds = {};
-
-  // Extract color, bg color, label, and icon dynamically per category matching screenshot
-  Map<String, dynamic> _getAlertProps(String title) {
-    final t = title.toLowerCase();
-    if (t.contains('heavy') || t.contains('rainfall') || t.contains('critical') || t.contains('red')) {
-      return {
-        'color': const Color(0xFFEF4444), // Critical Red
-        'bgColor': const Color(0xFFFEE2E2),
-        'label': 'CRITICAL',
-        'icon': Icons.thunderstorm_rounded,
-      };
-    } else if (t.contains('traffic') || t.contains('congestion') || t.contains('high') || t.contains('orange')) {
-      return {
-        'color': const Color(0xFFF97316), // High Orange
-        'bgColor': const Color(0xFFFFEDD5),
-        'label': 'HIGH',
-        'icon': Icons.directions_car_outlined,
-      };
-    } else {
-      return {
-        'color': const Color(0xFF3B82F6), // Verified/Info Blue
-        'bgColor': const Color(0xFFDBEAFE),
-        'label': 'VERIFIED',
-        'icon': Icons.home_work_outlined,
-      };
-    }
-  }
+  bool _unreadOnly = false;
 
   @override
   Widget build(BuildContext context) {
-    const titleColor = Color(0xFF0F172A);
-    const subtitleColor = Color(0xFF64748B);
-    const scaffoldBgColor = Color(0xFFF8FAFC);
-
     return ListenableBuilder(
       listenable: NotificationService.instance,
       builder: (context, _) {
         final service = NotificationService.instance;
-        final list = service.notifications;
-        final unreadCount = service.unreadCount;
+        final today = service.notifications
+            .where((n) => !_unreadOnly || n['isRead'] == false)
+            .toList();
+        final yesterday = _demoYesterdayNotifications
+            .where((n) => !_unreadOnly || n['isRead'] == false)
+            .toList();
 
         return Scaffold(
-          backgroundColor: scaffoldBgColor,
+          backgroundColor: const Color(0xFFF8FAFC),
           appBar: AppBar(
-            backgroundColor: scaffoldBgColor,
+            backgroundColor: const Color(0xFFF8FAFC),
             elevation: 0,
-            leadingWidth: 70,
-            leading: Padding(
-              padding: const EdgeInsets.only(left: 20, top: 8, bottom: 8),
-              child: GestureDetector(
-                onTap: () => context.pop(),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: const Icon(
-                    Icons.chevron_left_rounded,
-                    color: Color(0xFF0F172A),
-                    size: 24,
-                  ),
-                ),
+            centerTitle: true,
+            leading: IconButton(
+              onPressed: () => context.pop(),
+              icon: const Icon(
+                Icons.arrow_back_rounded,
+                color: Color(0xFF101828),
+                size: 25,
               ),
             ),
             title: const Text(
               'Notifications',
               style: TextStyle(
-                color: titleColor,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+                color: Color(0xFF101828),
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
               ),
             ),
-            centerTitle: true,
           ),
           body: SafeArea(
             child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
               physics: const BouncingScrollPhysics(),
               children: [
-                // ── 1. SYSTEM ALERTS HUB TOP CARD ─────────────────────────────
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.02),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      // Bell Icon Container
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFEEF2FF),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.notifications_none_rounded,
-                          color: Color(0xFF4F46E5),
-                          size: 22,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      // Text Description Row
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text(
-                              'SYSTEM ALERTS HUB',
-                              style: TextStyle(
-                                color: Color(0xFF4F46E5),
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1.0,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Text(
-                                  '${list.length} Alerts Logged',
-                                  style: const TextStyle(
-                                    color: titleColor,
-                                    fontSize: 14.5,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                if (unreadCount > 0) ...[
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFEE2E2),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Text(
-                                      '$unreadCount Unread',
-                                      style: const TextStyle(
-                                        color: Color(0xFFEF4444),
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Mark All Read Button
-                      if (unreadCount > 0)
-                        OutlinedButton(
-                          onPressed: () {
-                            service.markAllAsRead();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('✨ All notifications marked as read'),
-                                backgroundColor: Color(0xFF4F46E5),
-                                behavior: SnackBarBehavior.floating,
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                          },
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.check_rounded, color: Color(0xFF4F46E5), size: 14),
-                              SizedBox(width: 4),
-                              Text(
-                                'Mark all read',
-                                style: TextStyle(
-                                  color: Color(0xFF4F46E5),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // ── 2. SYSTEM ALERTS FEED ─────────────────────────────────────
-                if (list.isEmpty)
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 80.0),
-                      child: Column(
-                        children: [
-                          Icon(Icons.notifications_off_outlined,
-                              color: subtitleColor.withValues(alpha: 0.3), size: 48),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'No Alerts Available',
-                            style: TextStyle(color: subtitleColor, fontSize: 14, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
+                Row(
+                  children: [
+                    _FilterPill(
+                      label: 'All',
+                      selected: !_unreadOnly,
+                      onTap: () => setState(() => _unreadOnly = false),
                     ),
-                  )
-                else
-                  ...list.map((item) {
-                    final id = item['id'];
-                    final isRead = item['isRead'];
-                    final isExpanded = _expandedIds.contains(id);
-                    final props = _getAlertProps(item['title']);
-
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.02),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: IntrinsicHeight(
-                          child: Row(
-                            children: [
-                              // Left solid vertical category accent bar
-                              Container(
-                                width: 5.5,
-                                color: props['color'],
-                              ),
-                              Expanded(
-                                child: InkWell(
-                                  onTap: () {
-                                    // Mark alert as read on click
-                                    service.markAsRead(id);
-
-                                    // Toggle expansion to read details inline
-                                    setState(() {
-                                      if (isExpanded) {
-                                        _expandedIds.remove(id);
-                                      } else {
-                                        _expandedIds.add(id);
-                                      }
-                                    });
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        // Header Row matching mockup exactly
-                                        Row(
-                                          children: [
-                                            // Circular colored background icon container
-                                            Container(
-                                              width: 48,
-                                              height: 48,
-                                              decoration: BoxDecoration(
-                                                color: props['bgColor'],
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: Icon(
-                                                props['icon'],
-                                                color: props['color'],
-                                                size: 24,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 14),
-                                            // Content Column
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  // Category dot and tag row
-                                                  Row(
-                                                    children: [
-                                                      Container(
-                                                        width: 6,
-                                                        height: 6,
-                                                        decoration: BoxDecoration(
-                                                          color: props['color'],
-                                                          shape: BoxShape.circle,
-                                                        ),
-                                                      ),
-                                                      const SizedBox(width: 6),
-                                                      Text(
-                                                        props['label'],
-                                                        style: TextStyle(
-                                                          color: props['color'],
-                                                          fontSize: 9.5,
-                                                          fontWeight: FontWeight.w900,
-                                                          letterSpacing: 0.5,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  // Notification Title
-                                                  Text(
-                                                    item['title'],
-                                                    style: TextStyle(
-                                                      color: isRead ? subtitleColor : titleColor,
-                                                      fontSize: 14.5,
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 6),
-                                                  // Clock icon and PKT timestamp row
-                                                  Row(
-                                                    children: [
-                                                      const Icon(
-                                                        Icons.access_time_rounded,
-                                                        color: Color(0xFF94A3B8),
-                                                        size: 13,
-                                                      ),
-                                                      const SizedBox(width: 4),
-                                                      Text(
-                                                        item['time'],
-                                                        style: const TextStyle(
-                                                          color: Color(0xFF94A3B8),
-                                                          fontSize: 11,
-                                                          fontWeight: FontWeight.w500,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            // Right Chevron Arrow
-                                            Icon(
-                                              Icons.chevron_right_rounded,
-                                              color: const Color(0xFF94A3B8),
-                                              size: 24,
-                                              key: ValueKey('chevron_$id'),
-                                            ),
-                                          ],
-                                        ),
-
-                                        // Collapsible inline details panel
-                                        AnimatedCrossFade(
-                                          firstChild: const SizedBox(height: 0),
-                                          secondChild: Padding(
-                                            padding: const EdgeInsets.only(top: 14.0),
-                                            child: Container(
-                                              width: double.infinity,
-                                              padding: const EdgeInsets.all(14),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFF8FAFC),
-                                                borderRadius: BorderRadius.circular(12),
-                                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                                              ),
-                                              child: Text(
-                                                item['details'],
-                                                style: const TextStyle(
-                                                  color: titleColor,
-                                                  fontSize: 12.5,
-                                                  height: 1.45,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          crossFadeState: isExpanded
-                                              ? CrossFadeState.showSecond
-                                              : CrossFadeState.showFirst,
-                                          duration: const Duration(milliseconds: 200),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
+                    const SizedBox(width: 12),
+                    _FilterPill(
+                      label: 'Unread',
+                      selected: _unreadOnly,
+                      onTap: () => setState(() => _unreadOnly = true),
+                    ),
+                    const Spacer(),
+                    _MarkReadButton(
+                      enabled: service.unreadCount > 0,
+                      onTap: service.markAllAsRead,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 22),
+                if (today.isNotEmpty) ...[
+                  const _SectionTitle('Today'),
+                  const SizedBox(height: 12),
+                  ...today.map(
+                    (item) => _NotificationCard(
+                      item: item,
+                      onTap: () => service.markAsRead(item['id']),
+                    ),
+                  ),
+                ],
+                if (yesterday.isNotEmpty) ...[
+                  const SizedBox(height: 18),
+                  const _SectionTitle('Yesterday'),
+                  const SizedBox(height: 12),
+                  ...yesterday.map(
+                    (item) => _NotificationCard(item: item, onTap: () {}),
+                  ),
+                ],
+                if (today.isEmpty && yesterday.isEmpty) const _EmptyState(),
               ],
             ),
           ),
@@ -425,3 +104,344 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 }
+
+class _FilterPill extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _FilterPill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 17),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF5A5CE5) : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF5A5CE5).withValues(alpha: 0.18),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : const Color(0xFF1F2937),
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MarkReadButton extends StatelessWidget {
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _MarkReadButton({required this.enabled, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 160),
+        opacity: enabled ? 1 : 0.55,
+        child: Container(
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: const Text(
+            'Mark all as read',
+            style: TextStyle(
+              color: Color(0xFF1F2937),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  final String title;
+  const _SectionTitle(this.title);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: const TextStyle(
+        color: Color(0xFF101828),
+        fontSize: 16,
+        fontWeight: FontWeight.w900,
+      ),
+    );
+  }
+}
+
+class _NotificationCard extends StatelessWidget {
+  final Map<String, dynamic> item;
+  final VoidCallback onTap;
+
+  const _NotificationCard({required this.item, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final props = _props(item['title']);
+    final isRead = item['isRead'] == true;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF101828).withValues(alpha: 0.025),
+              blurRadius: 12,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: props.bg,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(props.icon, color: props.color, size: 24),
+            ),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                _friendlyTitle(item['title']),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: isRead
+                                      ? const Color(0xFF475467)
+                                      : const Color(0xFF101828),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                            if (!isRead) ...[
+                              const SizedBox(width: 5),
+                              Container(
+                                width: 5,
+                                height: 5,
+                                decoration: BoxDecoration(
+                                  color: props.color,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _friendlyTime(item['time']),
+                        style: const TextStyle(
+                          color: Color(0xFF667085),
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _friendlyDetails(item['details']),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF344054),
+                      fontSize: 11.5,
+                      height: 1.35,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 90),
+      child: Column(
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.notifications_none_rounded,
+              color: Color(0xFF5A5CE5),
+              size: 30,
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'No notifications here',
+            style: TextStyle(
+              color: Color(0xFF101828),
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NotificationProps {
+  final IconData icon;
+  final Color color;
+  final Color bg;
+
+  const _NotificationProps({
+    required this.icon,
+    required this.color,
+    required this.bg,
+  });
+}
+
+_NotificationProps _props(String title) {
+  final t = title.toLowerCase();
+  if (t.contains('rain') || t.contains('flood') || t.contains('critical')) {
+    return const _NotificationProps(
+      icon: Icons.water_drop_outlined,
+      color: Color(0xFF2563EB),
+      bg: Color(0xFFEFF6FF),
+    );
+  }
+  if (t.contains('traffic') || t.contains('congestion') || t.contains('high')) {
+    return const _NotificationProps(
+      icon: Icons.flag_outlined,
+      color: Color(0xFF5A5CE5),
+      bg: Color(0xFFF0EFFE),
+    );
+  }
+  if (t.contains('payment') || t.contains('required')) {
+    return const _NotificationProps(
+      icon: Icons.credit_card_rounded,
+      color: Color(0xFF2563EB),
+      bg: Color(0xFFEFF6FF),
+    );
+  }
+  if (t.contains('otp') || t.contains('verification')) {
+    return const _NotificationProps(
+      icon: Icons.lock_outline_rounded,
+      color: Color(0xFF5A5CE5),
+      bg: Color(0xFFF0EFFE),
+    );
+  }
+  return const _NotificationProps(
+    icon: Icons.assignment_turned_in_outlined,
+    color: Color(0xFF2563EB),
+    bg: Color(0xFFEAF2FF),
+  );
+}
+
+String _friendlyTitle(String title) {
+  final t = title.toLowerCase();
+  if (t.contains('rain')) return 'Flood Watch Ready';
+  if (t.contains('traffic')) return 'Route Marked as High Priority';
+  if (t.contains('urban flooding')) return 'Incident Verified';
+  if (t.contains('real mode')) return 'Live Monitoring Started';
+  if (t.contains('demo mode')) return 'Demo Location Active';
+  if (t.contains('demo update')) return 'Crisis Update Ready';
+  return title;
+}
+
+String _friendlyDetails(String details) {
+  return details
+      .replaceAll('Weather Agent', 'Weather check')
+      .replaceAll('Traffic Agent', 'Traffic check')
+      .replaceAll('Social Post corroboration', 'Citizen report match')
+      .replaceAll('CIRO', 'Ciro')
+      .trim();
+}
+
+String _friendlyTime(String time) {
+  if (time.contains('14:32')) return '15 sec ago';
+  if (time.contains('14:28')) return '5 mins ago';
+  if (time.contains('14:15')) return '6 mins ago';
+  if (time.contains('PKT')) return 'just now';
+  return time;
+}
+
+final List<Map<String, dynamic>> _demoYesterdayNotifications = [
+  {
+    'id': 'y1',
+    'title': 'Welcome to CIRO',
+    'details': 'Start by choosing demo G-10 or live location monitoring.',
+    'time': '1 day ago',
+    'isRead': true,
+  },
+  {
+    'id': 'y2',
+    'title': 'OTP Verification Successful',
+    'details':
+        'Your account has been successfully verified. You can now access the platform.',
+    'time': '1 day ago',
+    'isRead': true,
+  },
+];

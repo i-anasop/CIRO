@@ -61,8 +61,13 @@ class LocationService {
       return LocationResult(
         latitude:  33.6200,
         longitude: 73.0000,
-        isMock:    false,
+        address:   'Fallback location near Islamabad, Pakistan',
+        area:      'Islamabad fallback',
+        city:      'Islamabad',
+        country:   'Pakistan',
+        isMock:    true,
         isSuccess: true,
+        errorMessage: 'GPS fallback used: ${e.runtimeType}',
       );
     }
   }

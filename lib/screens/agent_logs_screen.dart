@@ -1,772 +1,673 @@
-// CIRO — Agent Logs / Trace Screen v6
-// Exact pixel-perfect implementation of the provided UI design (Screen 4).
-// 100% interactive and fully functional dynamic logs: tabbed view switching, stateful collapsible reasoning details, real-time matching with the active crisis scenario, and custom dashed tactical timeline.
+// CIRO - Simple public-facing explanation screen.
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../services/scenario_engine.dart';
-import '../models/crisis.dart';
 
-class AgentLogsScreen extends StatefulWidget {
+import '../models/crisis.dart';
+import '../models/orchestration_models.dart';
+import '../models/signal.dart';
+import '../services/scenario_engine.dart';
+import '../theme/colors.dart';
+
+class AgentLogsScreen extends StatelessWidget {
   const AgentLogsScreen({super.key});
 
   @override
-  State<AgentLogsScreen> createState() => _AgentLogsScreenState();
-}
-
-class _AgentLogsScreenState extends State<AgentLogsScreen> {
-  String _activeTab = 'Agent Timeline'; // 'Agent Timeline' or 'Summary'
-  int _expandedIndex = -1; // Collapsible drawer per agent card
-
-  // Dynamic templates matching the selected crisis category type
-  List<_AgentStep> _getStepsForCrisis(Crisis crisis) {
-    final type = crisis.typeLabel.toLowerCase();
-    
-    if (type.contains('flood') || type.contains('water')) {
-      return [
-        _AgentStep(
-          time: '10:32 AM',
-          agent: 'Signal Agent',
-          status: 'Completed',
-          detail: 'Ingested 27 signals from weather, sensors, social media, and reports.',
-          pill: '27 signals',
-          pillColor: const Color(0xFF4F46E5),
-          pillBg: const Color(0xFFEEF2FF),
-          icon: Icons.radar_rounded,
-          reasoning: '>>> SIGNAL INGESTION SYSTEM PIPELINE ACTIVE\n- Social Posts: Urdu token matching "pani bhar gaya" resolved to Flooding (Confidence: 89%)\n- Weather Station: Heavy Rainfall Alert (Red status, 50mm expected within 1 hour)\n- Traffic Grid: F-7/G-10 congestion spike detected (85% delay factor)',
-        ),
-        _AgentStep(
-          time: '10:33 AM',
-          agent: 'Detection Agent',
-          status: 'Completed',
-          detail: 'Anomaly detected in rainfall intensity and water level rise in F-7 Markaz.',
-          pill: 'Anomaly Score: 0.86',
-          pillColor: const Color(0xFF4F46E5),
-          pillBg: const Color(0xFFEEF2FF),
-          icon: Icons.search_rounded,
-          reasoning: '>>> CRITICAL ANOMALY CLASSIFIED\n- Water sensors at F-7 Markaz underpass report water levels exceeded 2.4 meters (Warning threshold: 1.5m)\n- Anomaly Score: 0.86 indicating verified urban water logging event.',
-        ),
-        _AgentStep(
-          time: '10:34 AM',
-          agent: 'Severity Agent',
-          status: 'Completed',
-          detail: 'Assessed potential impact based on exposure, depth, and population.',
-          pill: 'Severity: High',
-          pillColor: Colors.orange,
-          pillBg: const Color(0xFFFFF7ED),
-          icon: Icons.warning_amber_rounded,
-          reasoning: '>>> IMPACT RISK ESTIMATOR RUNNING\n- Expected water depth: 3.2 feet at critical bypass point\n- Affected citizens estimate: 3,200+ commuters in the block\n- Escalation risk: High due to continuous downpour',
-        ),
-        _AgentStep(
-          time: '10:35 AM',
-          agent: 'Response Planner Agent',
-          status: 'Completed',
-          detail: 'Recommended response actions and resource allocation.',
-          pill: 'Plan Generated',
-          pillColor: Colors.green,
-          pillBg: const Color(0xFFF0FDF4),
-          icon: Icons.assignment_turned_in_rounded,
-          reasoning: '>>> ORCHESTRATED RESPONSE TASK LISTING\n- ACTION 1: Dispatch heavy drainage pump squad (ETA: 8 mins)\n- ACTION 2: Reroute Blue Line transit via alternative highway lanes\n- ACTION 3: Transmit emergency broadcast SMS to 4,800 local zone cellphones',
-        ),
-        _AgentStep(
-          time: '10:36 AM',
-          agent: 'Simulation Agent',
-          status: 'In Progress',
-          detail: 'Running flood spread simulation and impact estimation.',
-          pill: 'ETA: 2 min',
-          pillColor: const Color(0xFF8B5CF6),
-          pillBg: const Color(0xFFF5F3FF),
-          icon: Icons.play_circle_fill_rounded,
-          isSimulation: true,
-          reasoning: '>>> RUNNING DISPATCH OUTCOME SIMULATION\n- Model predicts water levels drop to safe levels in 45 minutes if pump is online by 10:45 AM\n- Rerouting lowers regional traffic congestion from 88% down to 52%',
-        ),
-      ];
-    } else if (type.contains('accident') || type.contains('crash') || type.contains('collision')) {
-      return [
-        _AgentStep(
-          time: '02:15 PM',
-          agent: 'Signal Agent',
-          status: 'Completed',
-          detail: 'Ingested 14 signals from highway cameras, social media, and emergency desk.',
-          pill: '14 signals',
-          pillColor: const Color(0xFF4F46E5),
-          pillBg: const Color(0xFFEEF2FF),
-          icon: Icons.radar_rounded,
-          reasoning: '>>> SIGNAL INGESTION SYSTEM PIPELINE ACTIVE\n- Camera feed G-9: Auto collision pattern match flagged\n- Twitter: Pakistani Urdu phrase "haadsa hua hai" detected near Srinagar Hwy\n- Emergency Desk: Multiple 1122 duplicate reports registered',
-        ),
-        _AgentStep(
-          time: '02:16 PM',
-          agent: 'Detection Agent',
-          status: 'Completed',
-          detail: 'Accident confirmed at Srinagar Highway. Multiple vehicle blockage.',
-          pill: 'Anomaly Score: 0.94',
-          pillColor: const Color(0xFF4F46E5),
-          pillBg: const Color(0xFFEEF2FF),
-          icon: Icons.search_rounded,
-          reasoning: '>>> ACCIDENT IDENTIFICATION COMPLETED\n- Location classified: Srinagar Highway Main Transit Route\n- Blockage verified across 2 primary lanes',
-        ),
-        _AgentStep(
-          time: '02:17 PM',
-          agent: 'Severity Agent',
-          status: 'Completed',
-          detail: 'Assessed casualty risk, structural blockage, and detour potential.',
-          pill: 'Severity: High',
-          pillColor: Colors.orange,
-          pillBg: const Color(0xFFFFF7ED),
-          icon: Icons.warning_amber_rounded,
-          reasoning: '>>> CASUALTY RISK FORECASTER\n- 2 drivers reported injured (Moderate severity classification)\n- Delay risk: Critical blockage on capital main freeway',
-        ),
-        _AgentStep(
-          time: '02:18 PM',
-          agent: 'Response Planner Agent',
-          status: 'Completed',
-          detail: 'Orchestrated dispatch parameters for rescue ambulances and traffic detours.',
-          pill: 'Plan Generated',
-          pillColor: Colors.green,
-          pillBg: const Color(0xFFF0FDF4),
-          icon: Icons.assignment_turned_in_rounded,
-          reasoning: '>>> EMERGENCY RESOURCE LOGS\n- ACTION 1: Dispatch ambulance squad from Sector I-8 Base (ETA: 6 mins)\n- ACTION 2: Direct capital police transit cruiser to establish barricades',
-        ),
-        _AgentStep(
-          time: '02:19 PM',
-          agent: 'Simulation Agent',
-          status: 'In Progress',
-          detail: 'Simulating clearing time and traffic recovery curves.',
-          pill: 'ETA: 4 min',
-          pillColor: const Color(0xFF8B5CF6),
-          pillBg: const Color(0xFFF5F3FF),
-          icon: Icons.play_circle_fill_rounded,
-          isSimulation: true,
-          reasoning: '>>> CLEARANCE CURVE SIMULATION\n- Complete lane recovery estimate: 32 minutes\n- Detention risk: Reduced by 45% using arterial diversion strategy',
-        ),
-      ];
-    } else {
-      // General backup template for other types (outage, blockage, heatwave)
-      return [
-        _AgentStep(
-          time: '04:02 PM',
-          agent: 'Signal Agent',
-          status: 'Completed',
-          detail: 'Ingested signals and normalized local grid complaints.',
-          pill: '12 signals',
-          pillColor: const Color(0xFF4F46E5),
-          pillBg: const Color(0xFFEEF2FF),
-          icon: Icons.radar_rounded,
-          reasoning: '>>> INCIDENT TELEMETRY CAPTURED\n- Utility grid alerts: 4 feeder stations reporting failure status\n- User complaints: 8 text signals verified in target block',
-        ),
-        _AgentStep(
-          time: '04:03 PM',
-          agent: 'Detection Agent',
-          status: 'Completed',
-          detail: 'System anomaly verified: Infrastructural outage.',
-          pill: 'Anomaly Score: 0.78',
-          pillColor: const Color(0xFF4F46E5),
-          pillBg: const Color(0xFFEEF2FF),
-          icon: Icons.search_rounded,
-          reasoning: '>>> CRITICAL OUTAGE EVENT MATCHED\n- Core infrastructure failure diagnosed near grid residential perimeter.',
-        ),
-        _AgentStep(
-          time: '04:04 PM',
-          agent: 'Severity Agent',
-          status: 'Completed',
-          detail: 'Calculated blackout perimeter and secondary fire risks.',
-          pill: 'Severity: Moderate',
-          pillColor: Colors.orange,
-          pillBg: const Color(0xFFFFF7ED),
-          icon: Icons.warning_amber_rounded,
-          reasoning: '>>> UTILITY SEVERITY ASSESSOR\n- Outage zone: 850 residential connections down\n- Secondary Risk: Low (Fire barriers checked)',
-        ),
-        _AgentStep(
-          time: '04:05 PM',
-          agent: 'Response Planner Agent',
-          status: 'Completed',
-          detail: 'Assigned grid engineer crew and backup power tickets.',
-          pill: 'Plan Generated',
-          pillColor: Colors.green,
-          pillBg: const Color(0xFFF0FDF4),
-          icon: Icons.assignment_turned_in_rounded,
-          reasoning: '>>> DIRECTIVE PLAN CREATED\n- Crew ticket dispatched to engineering division\n- ETA to site: 14 mins',
-        ),
-        _AgentStep(
-          time: '04:06 PM',
-          agent: 'Simulation Agent',
-          status: 'In Progress',
-          detail: 'Simulating restoration ETA and grid load distribution.',
-          pill: 'ETA: 1 min',
-          pillColor: const Color(0xFF8B5CF6),
-          pillBg: const Color(0xFFF5F3FF),
-          icon: Icons.play_circle_fill_rounded,
-          isSimulation: true,
-          reasoning: '>>> POWER RESTORATION SIMULATOR\n- Estimated power return: 60 minutes after engineer arrives on-site.',
-        ),
-      ];
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final themeBg = const Color(0xFFF8FAFC);
-    final titleColor = const Color(0xFF0F172A);
-    final subtitleColor = const Color(0xFF64748B);
-    final activeTabColor = const Color(0xFF4F46E5);
-
     return ListenableBuilder(
       listenable: ScenarioEngine.instance,
       builder: (context, _) {
-        final engine = ScenarioEngine.instance;
-        final crisis = engine.activeCrisis;
-        final steps = _getStepsForCrisis(crisis);
+        final result = ScenarioEngine.instance.currentResult;
+        final crisis = result.crisis;
+        final color = _severityColor(crisis.severity);
 
         return Scaffold(
-          backgroundColor: themeBg,
+          backgroundColor: CiroColors.bg1,
           appBar: AppBar(
-            backgroundColor: themeBg,
+            backgroundColor: CiroColors.bg1,
+            surfaceTintColor: CiroColors.bg1,
             elevation: 0,
-            centerTitle: true,
-            leading: Padding(
-              padding: const EdgeInsets.only(left: 14),
-              child: Center(
-                child: GestureDetector(
-                  onTap: () => context.go('/home'),
-                  child: Container(
-                    width: 36, height: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Icon(Icons.arrow_back_ios_new_rounded, size: 14, color: titleColor),
-                  ),
-                ),
-              ),
+            title: const Text(
+              'Why CIRO Flagged This',
+              style: TextStyle(fontWeight: FontWeight.w900),
             ),
-            title: Column(
-              children: [
-                Text(
-                  'Agent Trace',
-                  style: TextStyle(color: titleColor, fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Report ID: CR-${crisis.id.replaceAll("CR-", "")}',
-                  style: TextStyle(color: subtitleColor, fontSize: 10, fontWeight: FontWeight.w600),
-                ),
-              ],
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_rounded),
+              onPressed: () => context.go('/home/crisis-detail', extra: crisis),
             ),
-            actions: [
-              Padding(
-                padding: const EdgeInsets.only(right: 14),
-                child: Center(
-                  child: Container(
-                    width: 36, height: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: IconButton(
-                      icon: Icon(Icons.tune_rounded, size: 16, color: titleColor),
-                      onPressed: () {
-                        setState(() {
-                          _expandedIndex = -1; // Reset drawers
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Logs filter: High Severity Agent logs active.')),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ),
-            ],
           ),
-          body: Column(
+          body: ListView(
+            padding: const EdgeInsets.fromLTRB(18, 8, 18, 104),
             children: [
-              // ── Overall Assessment Card ─────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.02),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFEEF2FF),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          crisis.typeLabel.toLowerCase().contains('flood')
-                              ? Icons.waves_rounded
-                              : (crisis.typeLabel.toLowerCase().contains('accident')
-                                  ? Icons.car_crash_rounded
-                                  : Icons.warning_amber_rounded),
-                          color: activeTabColor,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Overall Assessment',
-                              style: TextStyle(color: subtitleColor, fontSize: 10, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${crisis.typeLabel} • Confidence: ${crisis.confidencePercent}%',
-                              style: TextStyle(color: titleColor, fontSize: 13.5, fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEF2F2),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFFEE2E2)),
-                        ),
-                        child: Text(
-                          crisis.severityLabel.toUpperCase(),
-                          style: const TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // ── Tab Bar Toggle ──────────────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _activeTab = 'Agent Timeline'),
-                        child: Column(
-                          children: [
-                            Text(
-                              'Agent Timeline',
-                              style: TextStyle(
-                                color: _activeTab == 'Agent Timeline' ? titleColor : subtitleColor,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              height: 3,
-                              decoration: BoxDecoration(
-                                color: _activeTab == 'Agent Timeline' ? activeTabColor : Colors.transparent,
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _activeTab = 'Summary'),
-                        child: Column(
-                          children: [
-                            Text(
-                              'Summary',
-                              style: TextStyle(
-                                color: _activeTab == 'Summary' ? titleColor : subtitleColor,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              height: 3,
-                              decoration: BoxDecoration(
-                                color: _activeTab == 'Summary' ? activeTabColor : Colors.transparent,
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // ── Dynamic Body Render ─────────────────────────────────────────
-              Expanded(
-                child: _activeTab == 'Agent Timeline'
-                    ? _buildTimelineList(steps)
-                    : _buildSummaryTab(crisis),
-              ),
+              _AlertSummary(crisis: crisis, color: color),
+              const SizedBox(height: 14),
+              _ReasonSnapshot(result: result),
+              const SizedBox(height: 14),
+              _SourceGrid(result: result),
+              const SizedBox(height: 14),
+              _ConfidenceCard(result: result),
+              const SizedBox(height: 14),
+              _NextActionCard(result: result),
             ],
           ),
         );
       },
     );
   }
+}
 
-  // ── Tab 1: Timeline List with custom dashed line structure ──────────────────
-  Widget _buildTimelineList(List<_AgentStep> steps) {
-    return ListView.builder(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
-      itemCount: steps.length + 1, // Last index is the footer safety shield
-      itemBuilder: (context, index) {
-        if (index == steps.length) {
-          // Bottom Shield Banner
-          return Padding(
-            padding: const EdgeInsets.only(top: 14),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0FDF4),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFDCFCE7)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.verified_user_rounded, color: Colors.green, size: 16),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'All critical agents active and operating normally.',
-                      style: TextStyle(color: Color(0xFF166534), fontSize: 11.5, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
+class _AlertSummary extends StatelessWidget {
+  final Crisis crisis;
+  final Color color;
 
-        final step = steps[index];
-        final isExpanded = _expandedIndex == index;
-        final isLast = index == steps.length - 1;
+  const _AlertSummary({required this.crisis, required this.color});
 
-        return IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Timestamp column
-              SizedBox(
-                width: 60,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 16),
-                    Text(
-                      step.time,
-                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 9.5, fontWeight: FontWeight.w700),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Tactical Dashed Line column
-              SizedBox(
-                width: 30,
-                child: Column(
-                  children: [
-                    const SizedBox(height: 16),
-                    Container(
-                      width: 10, height: 10,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: step.pillColor, width: 2),
-                      ),
-                    ),
-                    if (!isLast)
-                      Expanded(
-                        child: CustomPaint(
-                          size: const Size(1, double.infinity),
-                          painter: _DashedLinePainter(color: const Color(0xFFCBD5E1)),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-
-              // Expandable Card details
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 20),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.02),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                      border: Border.all(
-                        color: isExpanded ? step.pillColor : const Color(0xFFE2E8F0),
-                        width: isExpanded ? 1.4 : 1,
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Top row details
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _expandedIndex = isExpanded ? -1 : index;
-                            });
-                          },
-                          behavior: HitTestBehavior.opaque,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: BoxDecoration(color: step.pillBg, shape: BoxShape.circle),
-                                    child: Icon(step.icon, color: step.pillColor, size: 14),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    step.agent,
-                                    style: const TextStyle(
-                                      color: Color(0xFF0F172A),
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: step.isSimulation ? const Color(0xFFFFF7ED) : const Color(0xFFDCFCE7),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      step.status,
-                                      style: TextStyle(
-                                        color: step.isSimulation ? Colors.orange : Colors.green,
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    if (step.isSimulation)
-                                      const SizedBox(
-                                        width: 8, height: 8,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.orange,
-                                          strokeWidth: 1.5,
-                                        ),
-                                      )
-                                    else
-                                      const Icon(Icons.check_circle_rounded, color: Colors.green, size: 10),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-
-                        // Detail summary row
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _expandedIndex = isExpanded ? -1 : index;
-                            });
-                          },
-                          behavior: HitTestBehavior.opaque,
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  step.detail,
-                                  style: const TextStyle(
-                                    color: Color(0xFF1E293B),
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w500,
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Icon(
-                                isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.chevron_right_rounded,
-                                color: const Color(0xFF64748B),
-                                size: 16,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Bottom label row
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(color: step.pillBg, borderRadius: BorderRadius.circular(10)),
-                              child: Text(
-                                step.pill,
-                                style: TextStyle(color: step.pillColor, fontSize: 10, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            if (step.isSimulation)
-                              const SizedBox(
-                                width: 12, height: 12,
-                                child: CircularProgressIndicator(color: Color(0xFF8B5CF6), strokeWidth: 1.5),
-                              ),
-                          ],
-                        ),
-
-                        // Stateful expandable reasoning trace overlay
-                        if (isExpanded) ...[
-                          const SizedBox(height: 14),
-                          const Divider(color: Color(0xFFE2E8F0), height: 1),
-                          const SizedBox(height: 10),
-                          const Text(
-                            'AI AGENT DECISION TRACE & REASONING AUDIT:',
-                            style: TextStyle(
-                              color: Color(0xFF4F46E5),
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
-                            ),
-                            child: SelectableText(
-                              step.reasoning,
-                              style: const TextStyle(
-                                color: Color(0xFF0F172A),
-                                fontFamily: 'monospace',
-                                fontSize: 9.5,
-                                height: 1.4,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // ── Tab 2: Executive Summary Tab ───────────────────────────────────────────
-  Widget _buildSummaryTab(Crisis crisis) {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.all(24),
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: _softCard(radius: 26),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Crisis Operations Summary',
-            style: TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Comprehensive diagnostic summary automatically synthesized by CIRO Multi-Agent pipeline orchestration.',
-            style: TextStyle(color: Color(0xFF64748B), fontSize: 12, height: 1.4),
-          ),
-          const SizedBox(height: 20),
-
-          // Core status grid
           Row(
             children: [
-              Expanded(
-                child: _buildSummaryCard(
-                  'Active Agents',
-                  '9 / 9',
-                  'All engines online',
-                  Icons.smart_toy_outlined,
-                  const Color(0xFF4F46E5),
+              Container(
+                width: 62,
+                height: 62,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      color.withValues(alpha: 0.95),
+                      color.withValues(alpha: 0.68),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.22),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  _crisisIcon(crisis.type),
+                  color: Colors.white,
+                  size: 30,
                 ),
               ),
               const SizedBox(width: 14),
               Expanded(
-                child: _buildSummaryCard(
-                  'Verification',
-                  'Confirmed',
-                  'High confidence',
-                  Icons.gpp_good_outlined,
-                  Colors.green,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      crisis.typeLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: CiroColors.textPrimary,
+                        fontSize: 21,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on_outlined,
+                          color: CiroColors.textSecondary,
+                          size: 15,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            crisis.location,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: CiroColors.textSecondary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              _SeverityPill(label: crisis.severityLabel, color: color),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: _MetricTile(
+                  label: 'Confidence',
+                  value: '${crisis.confidence}%',
+                  color: color,
+                  icon: Icons.verified_rounded,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _MetricTile(
+                  label: 'People',
+                  value: _people(crisis.affectedPeople),
+                  color: CiroColors.brand,
+                  icon: Icons.groups_2_outlined,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _MetricTile(
+                  label: 'Status',
+                  value: crisis.statusLabel,
+                  color: CiroColors.info,
+                  icon: Icons.radar_rounded,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+}
 
-          // Comprehensive summary statement text container
+class _ReasonSnapshot extends StatelessWidget {
+  final dynamic result;
+
+  const _ReasonSnapshot({required this.result});
+
+  @override
+  Widget build(BuildContext context) {
+    final crisis = result.crisis as Crisis;
+    final signals = result.signalAssessments as List<SignalAssessment>;
+    final color = _severityColor(crisis.severity);
+
+    return _SectionCard(
+      title: 'Main reason',
+      icon: Icons.auto_awesome_rounded,
+      color: color,
+      child: Column(
+        children: [
           Container(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.02),
-                  blurRadius: 10,
+              color: color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: color.withValues(alpha: 0.16)),
+            ),
+            child: Row(
+              children: [
+                _StackedSignalDots(assessments: signals),
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Text(
+                    '${signals.length} independent signals matched the same place and crisis type.',
+                    style: const TextStyle(
+                      color: CiroColors.textPrimary,
+                      fontSize: 15,
+                      height: 1.28,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _ReasonStep(
+                  icon: Icons.place_outlined,
+                  label: 'Same area',
+                  value: _percent(
+                    _average(signals.map((s) => s.geolocationConfidence)),
+                  ),
+                  color: CiroColors.brand,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _ReasonStep(
+                  icon: Icons.priority_high_rounded,
+                  label: 'Urgent words',
+                  value: _percent(_average(signals.map((s) => s.urgencyScore))),
+                  color: CiroColors.high,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _ReasonStep(
+                  icon: Icons.warning_amber_rounded,
+                  label: 'Conflict',
+                  value: _percent(
+                    _average(signals.map((s) => s.contradictionLevel)),
+                  ),
+                  color: CiroColors.warning,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SourceGrid extends StatelessWidget {
+  final dynamic result;
+
+  const _SourceGrid({required this.result});
+
+  @override
+  Widget build(BuildContext context) {
+    final assessments = (result.signalAssessments as List<SignalAssessment>)
+        .take(4);
+    return _SectionCard(
+      title: 'Sources checked',
+      icon: Icons.hub_outlined,
+      color: CiroColors.brand,
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: assessments.map((assessment) {
+          return _SourceCard(assessment: assessment);
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _ConfidenceCard extends StatelessWidget {
+  final dynamic result;
+
+  const _ConfidenceCard({required this.result});
+
+  @override
+  Widget build(BuildContext context) {
+    final crisis = result.crisis as Crisis;
+    final assessments = result.signalAssessments as List<SignalAssessment>;
+    final credibility = _average(assessments.map((s) => s.credibility));
+    final location = _average(assessments.map((s) => s.geolocationConfidence));
+    final urgency = _average(assessments.map((s) => s.urgencyScore));
+
+    return _SectionCard(
+      title: 'How strong is it?',
+      icon: Icons.speed_rounded,
+      color: CiroColors.info,
+      child: Column(
+        children: [
+          _ConfidenceRing(
+            value: crisis.confidencePercent / 100,
+            label: 'Overall',
+            color: _severityColor(crisis.severity),
+          ),
+          const SizedBox(height: 14),
+          _Bar(
+            label: 'Trusted sources',
+            value: credibility,
+            color: CiroColors.success,
+          ),
+          const SizedBox(height: 10),
+          _Bar(
+            label: 'Location match',
+            value: location,
+            color: CiroColors.brand,
+          ),
+          const SizedBox(height: 10),
+          _Bar(label: 'Urgency level', value: urgency, color: CiroColors.high),
+        ],
+      ),
+    );
+  }
+}
+
+class _NextActionCard extends StatelessWidget {
+  final dynamic result;
+
+  const _NextActionCard({required this.result});
+
+  @override
+  Widget build(BuildContext context) {
+    final actions = result.responsePlan.take(2).toList();
+    return _SectionCard(
+      title: 'Next actions',
+      icon: Icons.task_alt_rounded,
+      color: CiroColors.success,
+      child: Column(
+        children: [
+          _VerificationStrip(verification: result.verification),
+          const SizedBox(height: 10),
+          ...actions.map(
+            (action) => _ActionRow(
+              title: action.title,
+              subtitle: '${action.department} • ${action.eta}',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SourceCard extends StatelessWidget {
+  final SignalAssessment assessment;
+
+  const _SourceCard({required this.assessment});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _sourceColor(assessment.source);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = ((constraints.maxWidth - 10) / 2).clamp(130.0, 190.0);
+        return SizedBox(
+          width: width,
+          child: Container(
+            height: 134,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.07),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: color.withValues(alpha: 0.16)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.description_outlined, color: Color(0xFF4F46E5), size: 16),
-                    SizedBox(width: 8),
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        _sourceIcon(assessment.source),
+                        color: color,
+                        size: 18,
+                      ),
+                    ),
+                    const Spacer(),
                     Text(
-                      'Executive Action Statement',
-                      style: TextStyle(color: Color(0xFF0F172A), fontSize: 12.5, fontWeight: FontWeight.bold),
+                      _percent(assessment.credibility),
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 Text(
-                  'The CIRO system ingested multiple overlapping signals regarding "${crisis.typeLabel}" at "${crisis.location}". Signal corroboration across official weather warnings and traffic delay spikes yielded an Overall Assessment rating of ${crisis.severityLabel.toUpperCase()} (Confidence: ${crisis.confidencePercent}%).\n\nEmergency dispatch units have been alerted and alternate routing calculations are underway. Live telemetry remains operational.',
-                  style: const TextStyle(color: Color(0xFF1E293B), fontSize: 12, height: 1.5, fontWeight: FontWeight.w500),
+                  assessment.sourceLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: CiroColors.textPrimary,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Expanded(
+                  child: Text(
+                    _plain(assessment.finding),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: CiroColors.textSecondary,
+                      fontSize: 11,
+                      height: 1.24,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _MetricTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  final IconData icon;
+
+  const _MetricTile({
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 82,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 18),
+          const Spacer(),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: color,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: CiroColors.textSecondary,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StackedSignalDots extends StatelessWidget {
+  final List<SignalAssessment> assessments;
+
+  const _StackedSignalDots({required this.assessments});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 74,
+      height: 48,
+      child: Stack(
+        children: assessments.take(4).toList().asMap().entries.map((entry) {
+          final index = entry.key;
+          final assessment = entry.value;
+          final color = _sourceColor(assessment.source);
+          return Positioned(
+            left: index * 14,
+            child: Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.16),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Icon(
+                _sourceIcon(assessment.source),
+                color: Colors.white,
+                size: 18,
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _ReasonStep extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  const _ReasonStep({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 76,
+      padding: const EdgeInsets.all(9),
+      decoration: BoxDecoration(
+        color: CiroColors.bg2,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: CiroColors.borderLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 18),
+          const Spacer(),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 13.5,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: CiroColors.textSecondary,
+              fontSize: 10.3,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConfidenceRing extends StatelessWidget {
+  final double value;
+  final String label;
+  final Color color;
+
+  const _ConfidenceRing({
+    required this.value,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final safeValue = value.clamp(0.0, 1.0);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: CiroColors.bg2,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: CiroColors.borderLight),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 72,
+            height: 72,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: 72,
+                  height: 72,
+                  child: CircularProgressIndicator(
+                    value: safeValue,
+                    strokeWidth: 8,
+                    color: color,
+                    backgroundColor: color.withValues(alpha: 0.12),
+                    strokeCap: StrokeCap.round,
+                  ),
+                ),
+                Text(
+                  _percent(safeValue),
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: CiroColors.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                const Text(
+                  'CIRO recommends action because the signal strength is high enough for response teams to verify and prepare.',
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: CiroColors.textSecondary,
+                    fontSize: 11.5,
+                    height: 1.35,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
@@ -775,44 +676,103 @@ class _AgentLogsScreenState extends State<AgentLogsScreen> {
       ),
     );
   }
+}
 
-  Widget _buildSummaryCard(String title, String value, String sub, IconData icon, Color color) {
+class _Bar extends StatelessWidget {
+  final String label;
+  final double value;
+  final Color color;
+
+  const _Bar({required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final safeValue = value.clamp(0.0, 1.0);
+    return Row(
+      children: [
+        SizedBox(
+          width: 112,
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: CiroColors.textSecondary,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: safeValue,
+              minHeight: 9,
+              color: color,
+              backgroundColor: color.withValues(alpha: 0.12),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          _percent(safeValue),
+          style: TextStyle(
+            color: color,
+            fontSize: 11.5,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _VerificationStrip extends StatelessWidget {
+  final dynamic verification;
+
+  const _VerificationStrip({required this.verification});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _verificationColor(verification.type);
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 8,
-          ),
-        ],
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.16)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Icon(icon, color: color, size: 20),
-              Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: const TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: const TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            sub,
-            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 9.5, fontWeight: FontWeight.w600),
+          Icon(Icons.verified_outlined, color: color, size: 21),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  verification.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _plain(verification.note),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: CiroColors.textSecondary,
+                    fontSize: 11,
+                    height: 1.3,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -820,56 +780,226 @@ class _AgentLogsScreenState extends State<AgentLogsScreen> {
   }
 }
 
-// Custom Painter to draw a clean tactical dashed timeline path on left
-class _DashedLinePainter extends CustomPainter {
-  final Color color;
-  _DashedLinePainter({required this.color});
+class _ActionRow extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _ActionRow({required this.title, required this.subtitle});
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 1.2
-      ..style = PaintingStyle.stroke;
-
-    double maxH = size.height;
-    double startY = 0;
-    double dashLength = 4;
-    double spaceLength = 3;
-
-    while (startY < maxH) {
-      canvas.drawLine(Offset(size.width / 2, startY), Offset(size.width / 2, startY + dashLength), paint);
-      startY += dashLength + spaceLength;
-    }
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 9),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: CiroColors.bg2,
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(color: CiroColors.borderLight),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: CiroColors.brand.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.arrow_forward_rounded,
+              color: CiroColors.brand,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _plain(title),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: CiroColors.textPrimary,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _plain(subtitle),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: CiroColors.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
+}
+
+class _SectionCard extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Color color;
+  final Widget child;
+
+  const _SectionCard({
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.child,
+  });
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: _softCard(radius: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: CiroColors.textPrimary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 13),
+          child,
+        ],
+      ),
+    );
+  }
 }
 
-// Model class to hold timeline agent steps cleanly in memory
-class _AgentStep {
-  final String time;
-  final String agent;
-  final String status;
-  final String detail;
-  final String pill;
-  final Color pillColor;
-  final Color pillBg;
-  final IconData icon;
-  final bool isSimulation;
-  final String reasoning;
+class _SeverityPill extends StatelessWidget {
+  final String label;
+  final Color color;
 
-  _AgentStep({
-    required this.time,
-    required this.agent,
-    required this.status,
-    required this.detail,
-    required this.pill,
-    required this.pillColor,
-    required this.pillBg,
-    required this.icon,
-    this.isSimulation = false,
-    required this.reasoning,
-  });
+  const _SeverityPill({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
 }
+
+BoxDecoration _softCard({required double radius}) => BoxDecoration(
+  color: Colors.white,
+  borderRadius: BorderRadius.circular(radius),
+  border: Border.all(color: CiroColors.borderLight),
+  boxShadow: CiroColors.cardShadow,
+);
+
+double _average(Iterable<double> values) {
+  if (values.isEmpty) return 0;
+  return values.reduce((a, b) => a + b) / values.length;
+}
+
+Color _severityColor(SeverityLevel severity) => switch (severity) {
+  SeverityLevel.critical => CiroColors.critical,
+  SeverityLevel.high => CiroColors.high,
+  SeverityLevel.moderate => CiroColors.moderate,
+  SeverityLevel.low => CiroColors.low,
+  SeverityLevel.unknown => CiroColors.unknown,
+};
+
+Color _verificationColor(dynamic type) {
+  final name = type.toString();
+  if (name.contains('confirmed')) return CiroColors.success;
+  if (name.contains('conflicting')) return CiroColors.warning;
+  if (name.contains('falsePositive')) return CiroColors.error;
+  if (name.contains('escalation')) return CiroColors.brand;
+  return CiroColors.info;
+}
+
+Color _sourceColor(SignalSource source) => switch (source) {
+  SignalSource.socialPost => CiroColors.brand,
+  SignalSource.weatherAlert => CiroColors.info,
+  SignalSource.trafficData => CiroColors.high,
+  SignalSource.citizenReport => CiroColors.success,
+  SignalSource.emergencyCall => CiroColors.error,
+  SignalSource.mockSensor => const Color(0xFF06B6D4),
+  SignalSource.fieldReport => const Color(0xFF7C3AED),
+};
+
+IconData _crisisIcon(CrisisType type) => switch (type) {
+  CrisisType.urbanFlooding => Icons.flood_rounded,
+  CrisisType.roadBlockage => Icons.traffic_rounded,
+  CrisisType.accident => Icons.car_crash_rounded,
+  CrisisType.heatwave => Icons.thermostat_rounded,
+  CrisisType.powerOutage => Icons.power_off_rounded,
+};
+
+IconData _sourceIcon(SignalSource source) => switch (source) {
+  SignalSource.socialPost => Icons.chat_bubble_outline_rounded,
+  SignalSource.weatherAlert => Icons.thunderstorm_rounded,
+  SignalSource.trafficData => Icons.traffic_rounded,
+  SignalSource.citizenReport => Icons.person_pin_circle_rounded,
+  SignalSource.emergencyCall => Icons.call_rounded,
+  SignalSource.mockSensor => Icons.sensors_rounded,
+  SignalSource.fieldReport => Icons.assignment_rounded,
+};
+
+String _people(int value) {
+  if (value >= 1000) return '${(value / 1000).toStringAsFixed(1)}k';
+  return '$value';
+}
+
+String _percent(double value) => '${(value.clamp(0.0, 1.0) * 100).round()}%';
+
+String _plain(String text) => text
+    .replaceAll('Agent', 'CIRO')
+    .replaceAll('agent', 'CIRO')
+    .replaceAll('pipeline', 'check')
+    .replaceAll('Pipeline', 'Check')
+    .replaceAll('Antigravity', 'CIRO')
+    .replaceAll('trace', 'record')
+    .replaceAll('Trace', 'Record')
+    .replaceAll('fusion', 'comparison')
+    .replaceAll('Fusion', 'Comparison')
+    .replaceAll('ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â', '-')
+    .replaceAll('ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·', '•')
+    .replaceAll('ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°C', 'C')
+    .replaceAll('ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ', '-')
+    .trim();

@@ -19,6 +19,11 @@ dependencies:
   http: ^1.2.2                  # HTTP calls for all external APIs
   geolocator: ^13.0.2           # GPS location (Android/iOS/Web)
   permission_handler: ^11.3.1   # Android permission dialogs
+  flutter_local_notifications: ^21.0.0
+  flutter_map: ^8.3.0
+  latlong2: ^0.9.1
+  google_maps_flutter: ^2.17.0
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:

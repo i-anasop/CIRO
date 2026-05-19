@@ -4,6 +4,7 @@
 
 import 'crisis.dart';
 import 'signal.dart';
+import 'orchestration_models.dart';
 
 /// Verification states per AGENTS.md §11.
 enum VerificationType {
@@ -94,6 +95,7 @@ class DemoScenario {
   final String mapZoneLabel;
   final String resourceSummary;
   final List<String> resourceUnits;
+  final ScenarioOrchestrationHints orchestration;
 
   const DemoScenario({
     required this.id,
@@ -119,6 +121,7 @@ class DemoScenario {
     required this.mapZoneLabel,
     required this.resourceSummary,
     this.resourceUnits = const [],
+    this.orchestration = const ScenarioOrchestrationHints(),
   });
 
   /// Returns only active signal inputs.
@@ -132,11 +135,12 @@ class DemoScenario {
   /// Human-readable verification label.
   String get verificationLabel {
     switch (verificationType) {
-      case VerificationType.confirmed:          return '✅ Confirmed Crisis';
-      case VerificationType.needsVerification:  return '⚠️ Needs Verification';
-      case VerificationType.conflictingSignals: return '⚡ Conflicting Signals';
-      case VerificationType.falsePositiveRisk:  return '🔴 False Positive Risk';
-      case VerificationType.escalationRequired: return '🔼 Escalation Required';
+      case VerificationType.confirmed:          return 'Confirmed Crisis';
+      case VerificationType.needsVerification:  return 'Needs Verification';
+      case VerificationType.conflictingSignals: return 'Conflicting Signals';
+      case VerificationType.falsePositiveRisk:  return 'False Positive Risk';
+      case VerificationType.escalationRequired: return 'Escalation Required';
     }
   }
 }
+

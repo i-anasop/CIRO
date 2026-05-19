@@ -6,6 +6,10 @@ import 'package:go_router/go_router.dart';
 import '../theme/colors.dart';
 import '../theme/typography.dart';
 import '../theme/spacing.dart';
+import '../services/app_mode_service.dart';
+import '../services/location_service.dart';
+import '../services/geocoding_service.dart';
+import '../services/scenario_engine.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -47,9 +51,45 @@ class _SplashScreenState extends State<SplashScreen>
       _progressCtrl.forward();
     });
 
-    Future.delayed(const Duration(milliseconds: 3000), () {
-      if (mounted) context.go('/location');
-    });
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    final startTime = DateTime.now();
+
+    try {
+      final isRealMode = AppModeService.instance.isRealMode;
+      if (isRealMode) {
+        // Silently request current location and geocode it
+        final locResult = await LocationService.instance.getCurrentLocation();
+        final geocoded = await GeocodingService.instance.reverseGeocode(locResult);
+        
+        ScenarioEngine.instance.overrideLocation(
+          geocoded.displayLabel,
+          lat: geocoded.latitude,
+          lng: geocoded.longitude,
+        );
+
+        // Run live real mode crisis analysis silently in the background
+        await ScenarioEngine.instance.runRealSignalAnalysis(
+          latitude: geocoded.latitude,
+          longitude: geocoded.longitude,
+        );
+      }
+    } catch (e) {
+      debugPrint("Error initializing during splash: $e");
+    }
+
+    final elapsed = DateTime.now().difference(startTime);
+    final remainingDelay = const Duration(milliseconds: 2800) - elapsed;
+
+    if (remainingDelay > Duration.zero) {
+      await Future.delayed(remainingDelay);
+    }
+
+    if (mounted) {
+      context.go('/location');
+    }
   }
 
   @override
@@ -129,7 +169,7 @@ class _SplashScreenState extends State<SplashScreen>
                             ),
                           ),
                           const SizedBox(height: CiroSpacing.md),
-                          Text('Initializing agent pipeline...',
+                          Text('Preparing crisis dashboard...',
                               style: CiroTypography.caption),
                         ]),
                       ),

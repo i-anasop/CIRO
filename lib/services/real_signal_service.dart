@@ -67,12 +67,23 @@ class RealSignalService {
 
   /// Run the full real-data pipeline from GPS → geocode → weather → news → routes.
   /// Pass [useMockLocation: true] to skip GPS and use G-10 mock coords.
-  Future<RealSignalBundle> fetchAll({bool useMockLocation = false}) async {
+  Future<RealSignalBundle> fetchAll({
+    bool useMockLocation = false,
+    double? latitude,
+    double? longitude,
+  }) async {
     final warnings = <String>[];
 
     // 1. Location
     LocationResult location;
-    if (useMockLocation) {
+    if (latitude != null && longitude != null) {
+      location = LocationResult(
+        latitude:  latitude,
+        longitude: longitude,
+        isMock:    false,
+        isSuccess: true,
+      );
+    } else if (useMockLocation) {
       location = LocationService.instance.getMockLocation();
     } else {
       location = await LocationService.instance.getCurrentLocation();
@@ -95,7 +106,7 @@ class RealSignalService {
     // 3. Weather (parallel with news + routes)
     final weatherFuture = AppConfig.instance.hasOpenWeatherKey
         ? WeatherService.instance.getWeather(lat, lon)
-        : Future.value(WeatherResult.failure('No OpenWeather key'));
+        : Future.value(WeatherResult.failure('No OpenWeather key configured'));
 
     final newsFuture = AppConfig.instance.hasNewsApiKey
         ? NewsSignalService.instance.fetchSignals(
@@ -104,7 +115,7 @@ class RealSignalService {
 
     final routesFuture = AppConfig.instance.hasGoogleMapsKey
         ? RoutesService.instance.getTrafficConditions(lat, lon)
-        : Future.value(RouteResult.failure('No Google Maps key'));
+        : Future.value(RouteResult.failure('No Google Maps key configured'));
 
     // 4. Await all in parallel
     final results = await Future.wait([
@@ -119,6 +130,14 @@ class RealSignalService {
 
     if (!weather.isSuccess)  warnings.add('Weather: ${weather.errorMessage}');
     if (!traffic.isSuccess)  warnings.add('Traffic: ${traffic.errorMessage}');
+    if (!AppConfig.instance.hasNewsApiKey) {
+      warnings.add('News/Public Feed: No NewsAPI key configured');
+    } else if (news.isEmpty) {
+      warnings.add('News/Public Feed: no relevant local articles returned');
+    }
+    if (location.isMock) {
+      warnings.add('Location: fallback coordinates used');
+    }
 
     return RealSignalBundle(
       location:    location,

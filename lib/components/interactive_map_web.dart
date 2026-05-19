@@ -1,10 +1,14 @@
 // ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
+
 import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
+
 import 'package:flutter/material.dart';
 
-// Track registered view factories to avoid duplicate registration errors
-final Set<String> _registeredViewIds = {};
+import '../theme/colors.dart';
+import '../theme/typography.dart';
+
+final Set<String> _registeredViews = {};
 
 Widget createInteractiveMap({
   required double latitude,
@@ -13,49 +17,97 @@ Widget createInteractiveMap({
   required String selectedLayer,
   bool showRiskZone = false,
   bool showAltRoute = false,
+  int recenterSignal = 0,
 }) {
-  // Build dynamic Google Maps Embed URL based on category selection
-  String url;
+  final url = _embedUrl(
+    latitude: latitude,
+    longitude: longitude,
+    zoom: zoom,
+    selectedLayer: selectedLayer,
+  );
+  final viewId = 'ciro-google-embed-${url.hashCode}';
 
-  if (selectedLayer == 'Flood Risk') {
-    // Satellite View for flood risk assessment
-    url = 'https://maps.google.com/maps?q=$latitude,$longitude&z=$zoom&t=k&output=embed';
-  } else if (selectedLayer == 'Traffic') {
-    // Traffic layer view
-    url = 'https://maps.google.com/maps?q=$latitude,$longitude&z=$zoom&layer=traffic&output=embed';
-  } else if (selectedLayer == 'Shelters') {
-    // Search for nearest shelters / medical centers
-    url = 'https://maps.google.com/maps?q=hospital+shelter+near+$latitude,$longitude&z=$zoom&output=embed';
-  } else if (selectedLayer == 'Units') {
-    // Search for emergency response stations
-    url = 'https://maps.google.com/maps?q=fire+station+police+near+$latitude,$longitude&z=$zoom&output=embed';
-  } else {
-    // Default standard roadmap view
-    url = 'https://maps.google.com/maps?q=$latitude,$longitude&z=$zoom&output=embed';
-  }
-
-  // Build a unique ID from current parameters to allow dynamic updates
-  final layerId = selectedLayer.replaceAll(' ', '_');
-  final riskStr = showRiskZone ? 'r' : '';
-  final routeStr = showAltRoute ? 'a' : '';
-  final viewId = 'gmap-${latitude.toStringAsFixed(3)}-${longitude.toStringAsFixed(3)}-$zoom-$layerId$riskStr$routeStr';
-
-  // Only register if not already registered (avoid duplicate factory error)
-  if (!_registeredViewIds.contains(viewId)) {
-    _registeredViewIds.add(viewId);
+  if (!_registeredViews.contains(viewId)) {
+    _registeredViews.add(viewId);
     ui_web.platformViewRegistry.registerViewFactory(viewId, (int id) {
       return html.IFrameElement()
         ..src = url
-        ..style.border = 'none'
+        ..style.border = '0'
         ..style.width = '100%'
         ..style.height = '100%'
-        ..style.pointerEvents = 'auto'
-        ..allowFullscreen = true;
+        ..allowFullscreen = false
+        ..referrerPolicy = 'no-referrer-when-downgrade';
     });
   }
 
-  return HtmlElementView(
-    key: ValueKey(viewId),
-    viewType: viewId,
+  return Stack(
+    children: [
+      HtmlElementView(key: ValueKey(viewId), viewType: viewId),
+      Positioned(
+        top: 12,
+        left: 12,
+        child: _MapBadge(label: _label(selectedLayer)),
+      ),
+    ],
   );
+}
+
+String _embedUrl({
+  required double latitude,
+  required double longitude,
+  required int zoom,
+  required String selectedLayer,
+}) {
+  final query = Uri.encodeComponent(_query(latitude, longitude, selectedLayer));
+  return 'https://www.google.com/maps?q=$query&z=$zoom&output=embed';
+}
+
+String _query(double latitude, double longitude, String selectedLayer) {
+  final isG10 =
+      (latitude - 33.6946).abs() < 0.03 && (longitude - 73.0179).abs() < 0.03;
+  if (isG10) {
+    return switch (selectedLayer) {
+      'Traffic' => 'traffic near G-10 Markaz Islamabad',
+      'Shelters' => 'hospitals and shelters near G-10 Islamabad',
+      'Units' => 'fire station police station near G-10 Islamabad',
+      _ => 'G-10 Islamabad Pakistan',
+    };
+  }
+  return '$latitude,$longitude';
+}
+
+String _label(String selectedLayer) => 'G-10';
+
+class _MapBadge extends StatelessWidget {
+  final String label;
+  const _MapBadge({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.94),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: CiroColors.cardShadow,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.layers_rounded, size: 14, color: CiroColors.brand),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: CiroTypography.labelSmall.copyWith(
+                color: CiroColors.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

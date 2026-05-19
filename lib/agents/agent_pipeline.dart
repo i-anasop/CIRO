@@ -13,6 +13,7 @@ import '../models/signal.dart';
 import '../models/agent_log.dart';
 import '../models/simulation_result.dart';
 import '../models/pipeline_result.dart';
+import '../models/orchestration_models.dart';
 
 // ── 1. Signal Agent ───────────────────────────────────────────────────────
 // Normalizes raw scenario signals into the standard schema.
@@ -91,6 +92,172 @@ ResourceAllocation runResourceAgent(DemoScenario s) {
     unitCount: s.resourceUnits.length,
     summary: s.resourceSummary,
   );
+}
+
+List<SignalAssessment> runSignalAssessmentAgent(DemoScenario s) {
+  final hasConflict = s.verificationType == VerificationType.conflictingSignals ||
+      s.verificationType == VerificationType.falsePositiveRisk;
+  return s.activeSignals.map((sig) {
+    final credibility = switch (sig.source) {
+      SignalSource.weatherAlert => 0.94,
+      SignalSource.trafficData => 0.88,
+      SignalSource.mockSensor => 0.92,
+      SignalSource.fieldReport => 0.86,
+      SignalSource.emergencyCall => 0.84,
+      SignalSource.citizenReport => 0.76,
+      SignalSource.socialPost => 0.68,
+    };
+    final urgency = (sig.confidence + (s.severity == SeverityLevel.critical ? 0.18 : 0.08))
+        .clamp(0.0, 1.0)
+        .toDouble();
+    return SignalAssessment(
+      source: sig.source,
+      sourceLabel: _sourceLabel(sig.source),
+      credibility: credibility,
+      geolocationConfidence: sig.content.toLowerCase().contains(s.location.split(',').first.toLowerCase())
+          ? 0.90
+          : 0.72,
+      urgencyScore: urgency,
+      contradictionLevel: hasConflict ? 0.64 : 0.12,
+      finding: '${_sourceLabel(sig.source)} contributed ${(sig.confidence * 100).round()}% signal confidence.',
+    );
+  }).toList();
+}
+
+CrisisEvolution runEvolutionAgent(DemoScenario s) {
+  return CrisisEvolution(
+    affectedRadius: s.orchestration.affectedRadius,
+    affectedPopulation: s.affectedPopulation,
+    expectedDuration: s.expectedDuration,
+    peakImpactTime: s.orchestration.peakImpactTime,
+    spreadRisk: s.orchestration.spreadRisk,
+    uncertaintyRange: s.orchestration.uncertaintyRange,
+  );
+}
+
+List<ResourceDecision> runResourceDecisionAgent(DemoScenario s) {
+  final severityWeight = switch (s.severity) {
+    SeverityLevel.critical => 40,
+    SeverityLevel.high => 30,
+    SeverityLevel.moderate => 20,
+    SeverityLevel.low => 10,
+    SeverityLevel.unknown => 5,
+  };
+  final defaultTradeOff = s.orchestration.resourceTradeOffs.isNotEmpty
+      ? s.orchestration.resourceTradeOffs.first
+      : 'Maintains minimum standby capacity for secondary incidents.';
+  return s.resourceUnits.asMap().entries.map((entry) {
+    final score = (severityWeight + s.confidence ~/ 2 - entry.key * 3).clamp(1, 100).toInt();
+    return ResourceDecision(
+      resource: entry.value,
+      assignedTo: s.location,
+      priorityScore: score,
+      reason: 'Impact ${s.affectedPopulation}, urgency ${_severityLabel(s.severity)}, confidence ${s.confidence.toInt()}%.',
+      tradeOff: entry.key < s.orchestration.resourceTradeOffs.length
+          ? s.orchestration.resourceTradeOffs[entry.key]
+          : defaultTradeOff,
+    );
+  }).toList();
+}
+
+List<StakeholderNotification> runStakeholderAgent(DemoScenario s) {
+  final defaults = <String, String>{
+    'Public': 'Avoid ${s.location}. Follow official advisories and use alternate routes.',
+    'Emergency Services': 'Dispatch assigned units for ${_crisisLabel(s.crisisType)} at ${s.location}.',
+    'Hospitals': 'Prepare surge capacity for ${s.affectedPopulation} potentially affected people.',
+    'Utilities': 'Stand by for drainage, power, or field repair escalation near ${s.location}.',
+    'Transport Authority': 'Activate staged rerouting and monitor congestion side effects.',
+    'Command Center': 'CIRO confidence ${s.confidence.toInt()}%; verification state: ${s.verificationLabel}.',
+  };
+  final merged = {...defaults, ...s.orchestration.stakeholderMessages};
+  return merged.entries.map((e) => StakeholderNotification(
+        stakeholder: e.key,
+        channel: e.key == 'Public' ? 'SMS/App Alert' : 'Ops Console',
+        urgency: s.severity == SeverityLevel.critical ? 'Immediate' : 'Priority',
+        message: e.value,
+      )).toList();
+}
+
+MultiCrisisCoordination runCoordinationAgent(DemoScenario s) {
+  final related = s.orchestration.relatedIncidents;
+  return MultiCrisisCoordination(
+    isActive: related.isNotEmpty,
+    summary: related.isEmpty
+        ? 'Single active incident. Resource allocation optimized for ${s.location}.'
+        : '${related.length + 1} simultaneous incidents coordinated under constrained resources.',
+    relatedIncidents: related,
+    tradeOffs: s.orchestration.resourceTradeOffs,
+  );
+}
+
+List<AntigravityTraceEvent> runAntigravityTraceAgent(
+  DemoScenario s,
+  Crisis crisis,
+  ResourceAllocation resources,
+  VerificationDecision verification,
+) {
+  return [
+    AntigravityTraceEvent(
+      step: 1,
+      agent: 'Signal Agent',
+      action: 'Normalize multi-source inputs',
+      input: '${s.activeSignals.length} active signals',
+      output: 'Signals normalized from ${s.activeSignals.map((e) => _sourceLabel(e.source)).join(", ")}',
+      confidence: 0.86,
+      evidence: runSignalAgent(s).join(' | '),
+      metadata: {'sourceCount': s.activeSignals.length},
+    ),
+    AntigravityTraceEvent(
+      step: 2,
+      agent: 'Fusion Agent',
+      action: 'Score source agreement and contradictions',
+      input: s.location,
+      output: runFusionAgent(s).join(' '),
+      confidence: (s.confidence / 100).clamp(0.0, 1.0),
+      evidence: 'Credibility, geolocation confidence, urgency language, and contradiction level evaluated.',
+      metadata: {'verification': s.verificationType.name},
+    ),
+    AntigravityTraceEvent(
+      step: 3,
+      agent: 'Detection Agent',
+      action: 'Classify crisis and extract location',
+      input: s.title,
+      output: '${crisis.typeLabel} at ${crisis.location}',
+      confidence: crisis.confidencePercent / 100,
+      evidence: crisis.detectionReasoning,
+      metadata: {'affectedPeople': crisis.affectedPeople},
+    ),
+    AntigravityTraceEvent(
+      step: 4,
+      agent: 'Resource Agent',
+      action: 'Rank constrained response resources',
+      input: s.orchestration.resourceConstraint,
+      output: '${resources.unitCount} units assigned: ${resources.summary}',
+      confidence: 0.82,
+      evidence: s.orchestration.resourceTradeOffs.join(' | '),
+      metadata: {'units': resources.units},
+    ),
+    AntigravityTraceEvent(
+      step: 5,
+      agent: 'Simulation Agent',
+      action: 'Project impact before and after response',
+      input: '${s.responseActions.length} actions',
+      output: '${s.simulationMetrics.length} metrics simulated',
+      confidence: 0.80,
+      evidence: s.simulationMetrics.map((m) => '${m.label}: ${m.before} -> ${m.after}').join(' | '),
+      metadata: {'sideEffects': s.possibleSideEffects},
+    ),
+    AntigravityTraceEvent(
+      step: 6,
+      agent: 'Verification Agent',
+      action: 'Recover from false, missed, or conflicting signals',
+      input: s.verificationType.name,
+      output: verification.label,
+      confidence: verification.type == VerificationType.confirmed ? 0.91 : 0.68,
+      evidence: verification.note,
+      metadata: {'fallbackMode': s.orchestration.fallbackMode},
+    ),
+  ];
 }
 
 // ── 6. Response Planner Agent ─────────────────────────────────────────────

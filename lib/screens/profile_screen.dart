@@ -11,21 +11,27 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final _nameController  = TextEditingController();
-  final _roleController  = TextEditingController();
+  final _nameController = TextEditingController();
+  final _roleController = TextEditingController();
   final _emailController = TextEditingController();
   int _selectedIndex = 0;
   String? _customUrl;
+  String? _noticeTitle;
+  String? _noticeSubtitle;
+  IconData _noticeIcon = Icons.check_rounded;
+  bool _isExpanded = false;
+  bool _isProfileEditing = false;
 
   @override
   void initState() {
     super.initState();
     final profile = UserProfileService.instance;
-    _nameController.text  = profile.name;
-    _roleController.text  = profile.role;
+    _nameController.text = profile.name;
+    _roleController.text = profile.role;
     _emailController.text = profile.email;
-    _selectedIndex        = profile.avatarIndex;
-    _customUrl            = profile.customAvatarUrl;
+    _selectedIndex = profile.avatarIndex;
+    _customUrl = profile.customAvatarUrl;
+    _isExpanded = _selectedIndex >= 3 && _customUrl == null;
   }
 
   @override
@@ -39,39 +45,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _pickCustomPicture() async {
     final result = await pickImageBytes();
     if (result != null) {
-      setState(() => _customUrl = result);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✨ Profile picture updated successfully!'),
-          backgroundColor: Color(0xFF10B981),
-          duration: Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      setState(() {
+        _customUrl = result;
+        _noticeTitle = 'Profile photo ready';
+        _noticeSubtitle = 'Save your profile to keep this picture locally.';
+        _noticeIcon = Icons.photo_camera_rounded;
+      });
     }
   }
 
-  void _saveProfile() {
-    UserProfileService.instance.updateProfile(
+  Future<void> _saveProfileInPlace() async {
+    setState(() {
+      _isProfileEditing = false;
+    });
+    await UserProfileService.instance.updateProfile(
       name: _nameController.text,
       role: _roleController.text,
       email: _emailController.text,
       avatarIndex: _selectedIndex,
       customAvatarUrl: _customUrl,
     );
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('✨ Profile saved successfully'),
-        backgroundColor: Color(0xFF4F46E5),
-        duration: Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-    context.pop();
+    if (!mounted) return;
+    setState(() {
+      _noticeTitle = 'Profile updated';
+      _noticeSubtitle = 'Saved locally on this device.';
+      _noticeIcon = Icons.check_rounded;
+    });
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) {
+      setState(() {
+        _noticeTitle = null;
+        _noticeSubtitle = null;
+      });
+    }
   }
 
-  // Avatar badge configs exactly matching screenshot
+  // Avatar badge configs exactly matching premium crisis responder roles
   static const List<_BadgeConfig> _badges = [
     _BadgeConfig(
       bg: Color(0xFFEEF2FF),
@@ -97,14 +106,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
       icon: Icons.memory_rounded,
       iconColor: Color(0xFF8B5CF6),
     ),
+    _BadgeConfig(
+      bg: Color(0xFFECFEFF),
+      ring: Color(0xFF06B6D4),
+      icon: Icons.satellite_alt_rounded,
+      iconColor: Color(0xFF06B6D4),
+    ),
+    _BadgeConfig(
+      bg: Color(0xFFFFF1F2),
+      ring: Color(0xFFF43F5E),
+      icon: Icons.rocket_launch_rounded,
+      iconColor: Color(0xFFF43F5E),
+    ),
+    _BadgeConfig(
+      bg: Color(0xFFEFF6FF),
+      ring: Color(0xFF3B82F6),
+      icon: Icons.hub_rounded,
+      iconColor: Color(0xFF3B82F6),
+    ),
+    _BadgeConfig(
+      bg: Color(0xFFFDF2F8),
+      ring: Color(0xFFEC4899),
+      icon: Icons.psychology_rounded,
+      iconColor: Color(0xFFEC4899),
+    ),
   ];
 
   @override
   Widget build(BuildContext context) {
-    const brandColor    = Color(0xFF4F46E5);
-    const titleColor    = Color(0xFF0F172A);
+    const brandColor = Color(0xFF4F46E5);
+    const titleColor = Color(0xFF0F172A);
     const subtitleColor = Color(0xFF64748B);
-    const bgColor       = Color(0xFFF5F6FA);
+    const bgColor = Color(0xFFF5F6FA);
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -112,7 +145,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: titleColor, size: 18),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: titleColor,
+            size: 18,
+          ),
           onPressed: () => context.pop(),
         ),
         title: const Text(
@@ -132,7 +169,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
               // ── Large Avatar with camera badge ──────────────────────────
               Center(
                 child: Column(
@@ -142,15 +178,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         // Outer soft glow ring
                         Container(
-                          width: 114, height: 114,
+                          width: 114,
+                          height: 114,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: Colors.white,
+                            border: Border.all(
+                              color: const Color(0xFFE2E5FF),
+                              width: 3.5,
+                            ),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF4F46E5).withValues(alpha: 0.15),
-                                blurRadius: 24,
-                                offset: const Offset(0, 8),
+                                color: const Color(
+                                  0xFF4F46E5,
+                                ).withValues(alpha: 0.12),
+                                blurRadius: 18,
+                                offset: const Offset(0, 6),
                               ),
                             ],
                           ),
@@ -163,9 +206,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   colors: _customUrl != null
                                       ? [Colors.transparent, Colors.transparent]
                                       : [
-                                          UserProfileService.avatarColors[_selectedIndex],
-                                          UserProfileService.avatarColors[_selectedIndex]
-                                              .withValues(alpha: 0.7),
+                                          UserProfileService
+                                              .avatarColors[_selectedIndex],
+                                          UserProfileService
+                                              .avatarColors[_selectedIndex]
+                                              .withValues(alpha: 0.8),
                                         ],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
@@ -174,16 +219,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               child: _customUrl != null
                                   ? ClipOval(
                                       child: Image.network(
-                                        _customUrl!, fit: BoxFit.cover,
+                                        _customUrl!,
+                                        fit: BoxFit.cover,
                                         errorBuilder: (_, __, ___) => Icon(
-                                          UserProfileService.avatarIcons[_selectedIndex],
-                                          color: Colors.white, size: 46,
+                                          UserProfileService
+                                              .avatarIcons[_selectedIndex],
+                                          color: Colors.white,
+                                          size: 46,
                                         ),
                                       ),
                                     )
                                   : Icon(
-                                      UserProfileService.avatarIcons[_selectedIndex],
-                                      color: Colors.white, size: 46,
+                                      UserProfileService
+                                          .avatarIcons[_selectedIndex],
+                                      color: Colors.white,
+                                      size: 46,
                                     ),
                             ),
                           ),
@@ -196,21 +246,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: GestureDetector(
                             onTap: _pickCustomPicture,
                             child: Container(
-                              width: 34, height: 34,
+                              width: 34,
+                              height: 34,
                               decoration: const BoxDecoration(
-                                color: brandColor,
+                                color: Colors.white,
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Color(0x334F46E5),
-                                    blurRadius: 8,
-                                    offset: Offset(0, 3),
+                                    color: Colors.black12,
+                                    blurRadius: 6,
+                                    offset: Offset(0, 2),
                                   ),
                                 ],
                               ),
                               child: const Icon(
                                 Icons.camera_alt_rounded,
-                                color: Colors.white,
+                                color: brandColor,
                                 size: 16,
                               ),
                             ),
@@ -218,13 +269,208 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 14),
-                    Text(
-                      'Personalize your CIRO operator profile',
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Welcome to CIRO',
                       style: TextStyle(
-                        color: subtitleColor.withValues(alpha: 0.8),
-                        fontSize: 12.5,
+                        color: titleColor,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Manage your CIRO operator identity',
+                      style: TextStyle(
+                        color: subtitleColor.withValues(alpha: 0.9),
+                        fontSize: 14,
                         fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_noticeTitle != null && _noticeSubtitle != null) ...[
+                const SizedBox(height: 18),
+                _ProfileNotice(
+                  icon: _noticeIcon,
+                  title: _noticeTitle!,
+                  subtitle: _noticeSubtitle!,
+                ),
+              ],
+              const SizedBox(height: 32),
+
+              // ── Preset Avatar Badges Card ───────────────────────────────
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Card Header
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF3E8FF),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.badge_outlined,
+                            color: Color(0xFF4F46E5),
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Preset Avatar Badges',
+                                style: TextStyle(
+                                  color: Color(0xFF0F172A),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Select a premium crisis intelligence role badge',
+                                style: TextStyle(
+                                  color: Color(0xFF64748B),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Collapsible presets grid
+                    Center(
+                      child: AnimatedSize(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeInOut,
+                        child: Wrap(
+                          spacing: 16,
+                          runSpacing: 16,
+                          alignment: WrapAlignment.center,
+                          children: [
+                            ...List.generate(_isExpanded ? _badges.length : 3, (
+                              index,
+                            ) {
+                              final isSelected =
+                                  _selectedIndex == index && _customUrl == null;
+                              final badge = _badges[index];
+
+                              return GestureDetector(
+                                onTap: () => setState(() {
+                                  _selectedIndex = index;
+                                  _customUrl = null;
+                                }),
+                                child: Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Container(
+                                      width: 62,
+                                      height: 62,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: badge.bg,
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? badge.ring
+                                              : Colors.transparent,
+                                          width: 2.5,
+                                        ),
+                                      ),
+                                      child: Icon(
+                                        badge.icon,
+                                        color: badge.iconColor,
+                                        size: 26,
+                                      ),
+                                    ),
+                                    if (isSelected)
+                                      Positioned(
+                                        top: -2,
+                                        right: -2,
+                                        child: Container(
+                                          width: 20,
+                                          height: 20,
+                                          decoration: BoxDecoration(
+                                            color: badge.ring,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: Colors.white,
+                                              width: 2,
+                                            ),
+                                          ),
+                                          child: const Icon(
+                                            Icons.check_rounded,
+                                            color: Colors.white,
+                                            size: 11,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              );
+                            }),
+                            GestureDetector(
+                              onTap: () => setState(() {
+                                _isExpanded = !_isExpanded;
+                              }),
+                              child: Container(
+                                width: 62,
+                                height: 62,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: const Color(0xFFF1F5F9),
+                                  border: Border.all(
+                                    color: const Color(
+                                      0xFFCBD5E1,
+                                    ).withValues(alpha: 0.5),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: _isExpanded
+                                      ? const Icon(
+                                          Icons.keyboard_arrow_up_rounded,
+                                          color: Color(0xFF64748B),
+                                          size: 24,
+                                        )
+                                      : const Text(
+                                          '+5',
+                                          style: TextStyle(
+                                            color: Color(0xFF4F46E5),
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -232,154 +478,113 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 32),
 
-              // ── Preset Avatar Badges ────────────────────────────────────
-              const Text(
-                'Preset Avatar Badges',
-                style: TextStyle(
-                  color: titleColor,
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
+              // ── Profile Details Card ────────────────────────────────────
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 16),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: List.generate(4, (index) {
-                  final isSelected = _selectedIndex == index && _customUrl == null;
-                  final badge = _badges[index];
-
-                  return GestureDetector(
-                    onTap: () => setState(() {
-                      _selectedIndex = index;
-                      _customUrl = null;
-                    }),
-                    child: Stack(
-                      clipBehavior: Clip.none,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Card Header
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
-                          width: 62, height: 62,
+                          padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: badge.bg,
-                            border: Border.all(
-                              color: isSelected ? badge.ring : Colors.transparent,
-                              width: 2.5,
-                            ),
+                            color: const Color(0xFFF3E8FF),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Icon(
-                            badge.icon,
-                            color: badge.iconColor,
-                            size: 26,
+                          child: const Icon(
+                            Icons.person_outline_rounded,
+                            color: Color(0xFF4F46E5),
+                            size: 20,
                           ),
                         ),
-                        if (isSelected)
-                          Positioned(
-                            top: -2, right: -2,
-                            child: Container(
-                              width: 20, height: 20,
-                              decoration: BoxDecoration(
-                                color: badge.ring,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 2),
+                        const SizedBox(width: 14),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Profile Details',
+                                style: TextStyle(
+                                  color: Color(0xFF0F172A),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                              child: const Icon(Icons.check_rounded, color: Colors.white, size: 11),
-                            ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Update your personal and professional information',
+                                style: TextStyle(
+                                  color: Color(0xFF64748B),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                            ],
                           ),
+                        ),
+                        IconButton(
+                          onPressed: () {
+                            if (_isProfileEditing == true) {
+                              _saveProfileInPlace();
+                            } else {
+                              setState(() {
+                                _isProfileEditing = true;
+                              });
+                            }
+                          },
+                          icon: Icon(
+                            (_isProfileEditing == true)
+                                ? Icons.check_rounded
+                                : Icons.edit_rounded,
+                            color: (_isProfileEditing == true)
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFF4F46E5),
+                            size: 22,
+                          ),
+                        ),
                       ],
                     ),
-                  );
-                }),
+                    const SizedBox(height: 24),
+
+                    // Input Fields with inline placeholders
+                    _buildProfileTextField(
+                      controller: _nameController,
+                      placeholder: 'Full Name',
+                      icon: Icons.person_outline_rounded,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildProfileTextField(
+                      controller: _roleController,
+                      placeholder: 'Role / Designation',
+                      icon: Icons.business_center_outlined,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildProfileTextField(
+                      controller: _emailController,
+                      placeholder: 'Email Address',
+                      icon: Icons.mail_outline_rounded,
+                      keyboardType: TextInputType.emailAddress,
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 32),
 
-              // ── Full Name ───────────────────────────────────────────────
-              _buildFieldLabel('Full Name'),
-              const SizedBox(height: 8),
-              _buildTextField(
-                controller: _nameController,
-                hint: 'e.g. Sarah Khan',
-                icon: Icons.person_outline_rounded,
-                iconColor: const Color(0xFF4F46E5),
-                iconBg: const Color(0xFFEEF2FF),
-              ),
-              const SizedBox(height: 20),
-
-              // ── Role / Designation ──────────────────────────────────────
-              _buildFieldLabel('Role / Designation'),
-              const SizedBox(height: 8),
-              _buildTextField(
-                controller: _roleController,
-                hint: 'e.g. CIRO Operator',
-                icon: Icons.work_outline_rounded,
-                iconColor: const Color(0xFF4F46E5),
-                iconBg: const Color(0xFFEEF2FF),
-              ),
-              const SizedBox(height: 20),
-
-              // ── Email Address ───────────────────────────────────────────
-              _buildFieldLabel('Email Address'),
-              const SizedBox(height: 8),
-              _buildTextField(
-                controller: _emailController,
-                hint: 'e.g. operator@ciro.gov.pk',
-                icon: Icons.mail_outline_rounded,
-                iconColor: const Color(0xFF4F46E5),
-                iconBg: const Color(0xFFEEF2FF),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 36),
-
-              // ── Actions ─────────────────────────────────────────────────
-              Row(
-                children: [
-                  // Cancel
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => context.pop(),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 20),
-                        side: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                      ),
-                      child: const Text(
-                        'Cancel',
-                        style: TextStyle(
-                          color: Color(0xFF4F46E5),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  // Save Profile
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _saveProfile,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 20),
-                        backgroundColor: const Color(0xFF4F46E5),
-                        elevation: 0,
-                        shadowColor: Colors.transparent,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                      ),
-                      child: const Text(
-                        'Save Profile',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
               const SizedBox(height: 24),
             ],
           ),
@@ -388,67 +593,138 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildFieldLabel(String label) {
-    return Text(
-      label,
-      style: const TextStyle(
-        color: Color(0xFF0F172A),
-        fontSize: 14,
-        fontWeight: FontWeight.bold,
+  Widget _buildProfileTextField({
+    required TextEditingController controller,
+    required String placeholder,
+    required IconData icon,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
+    const brandColor = Color(0xFF4F46E5);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
+      ),
+      child: Row(
+        children: [
+          // Icon Container on the Left
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF2FF),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: brandColor, size: 20),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: TextField(
+                controller: controller,
+                keyboardType: keyboardType,
+                readOnly: _isProfileEditing != true,
+                style: const TextStyle(
+                  fontSize: 14.5,
+                  color: Color(0xFF0F172A),
+                  fontWeight: FontWeight.w700,
+                ),
+                decoration: InputDecoration(
+                  isDense: true,
+                  contentPadding: EdgeInsets.zero,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  focusedErrorBorder: InputBorder.none,
+                  hintText: placeholder,
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
+}
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-    required Color iconColor,
-    required Color iconBg,
-    TextInputType keyboardType = TextInputType.text,
-  }) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      style: const TextStyle(
-        fontSize: 14,
-        color: Color(0xFF0F172A),
-        fontWeight: FontWeight.w500,
+class _ProfileNotice extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  const _ProfileNotice({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFD8E2FF)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF4F46E5).withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(
-          color: Color(0xFFCBD5E1),
-          fontSize: 13.5,
-          fontWeight: FontWeight.normal,
-        ),
-        prefixIcon: Padding(
-          padding: const EdgeInsets.only(left: 14, right: 10),
-          child: Container(
-            width: 36, height: 36,
-            decoration: BoxDecoration(
-              color: iconBg,
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: const BoxDecoration(
+              color: Color(0xFFEEF2FF),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: iconColor, size: 18),
+            child: Icon(icon, color: const Color(0xFF4F46E5), size: 18),
           ),
-        ),
-        prefixIconConstraints: const BoxConstraints(minWidth: 60, minHeight: 52),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFFE8EDF5)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFFE8EDF5)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
-        ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
