@@ -40,7 +40,6 @@
 - [Resource Allocation And Simulation](#resource-allocation-and-simulation)
 - [Robustness And Recovery](#robustness-and-recovery)
 - [Technical Architecture](#technical-architecture)
-- [Google Sign-In & Onboarding](#google-sign-in--onboarding)
 - [Setup And Run](#setup-and-run)
 - [Testing](#testing)
 - [Demo Script](#demo-script)
@@ -130,6 +129,7 @@ Primary screens:
 | App framework | Flutter |
 | Language | Dart `^3.10.8` |
 | Routing | `go_router` |
+| Authentication | Google Sign-In (`google_sign_in` / Google Identity Services) |
 | State pattern | Singleton services with `ListenableBuilder` |
 | Local persistence | `shared_preferences` |
 | Environment config | `flutter_dotenv` |
@@ -138,7 +138,6 @@ Primary screens:
 | Maps | Google Maps embeds/routes, `google_maps_flutter`, `flutter_map`, `latlong2` |
 | Live weather | OpenWeather |
 | Public/news signals | NewsAPI |
-| Authentication | Google Sign-In (`google_sign_in`) |
 | Styling | Centralized theme tokens in `lib/theme` |
 | Testing | `flutter_test`, `flutter analyze` |
 
@@ -487,16 +486,6 @@ Architecture principles:
 
 ---
 
-## Google Sign-In & Onboarding
-
-CIRO provides a fully polished onboarding flow with two options:
-1. **Google Authentication**: Built on the official Google Sign-In SDK (`google_sign_in`).
-   - Uses dynamic client ID configuration from either your environment parameters or an interactive, user-facing configuration guide sheet.
-   - Includes a robust, fallback configuration (defaulting to the `email` scope to bypass the Google People API requirement if disabled in the OAuth Console), preventing 403 API connection crashes.
-2. **Manual Onboarding**: An instant, local-first option allowing users to enter their name and jump straight into the command center with zero artificial loading delays.
-
----
-
 ## Setup And Run
 
 ### Prerequisites
@@ -519,9 +508,18 @@ Create a root `.env` file:
 GOOGLE_MAPS_API_KEY=your_google_maps_or_routes_key
 OPENWEATHER_API_KEY=your_openweather_key
 NEWS_API_KEY=your_newsapi_key
+GOOGLE_CLIENT_ID=your_google_oauth_client_id.apps.googleusercontent.com
 ```
 
-The app still runs without keys. Demo Mode is fully functional offline.
+The app still runs without keys. Demo Mode is fully functional offline. If `GOOGLE_CLIENT_ID` is missing from the environment, you can dynamically configure it using the in-app bottom sheet setup guide.
+
+### Google Sign-In Setup
+
+To authenticate using Google:
+1. Enable the **People API** in your project from the [Google Cloud Console Library](https://console.cloud.google.com/apis/library/people.googleapis.com).
+2. Create an **OAuth Client ID** for Web Applications in your Google Cloud Console Credentials page.
+3. Add your development URL (e.g., `http://localhost:53052`) under **Authorized JavaScript Origins**.
+4. Set the `GOOGLE_CLIENT_ID` key in your `.env` file.
 
 ### Run Web
 
