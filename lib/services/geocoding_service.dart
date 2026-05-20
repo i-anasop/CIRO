@@ -31,7 +31,7 @@ class GeocodingService {
         '$_baseUrl?latlng=${base.latitude},${base.longitude}'
         '&key=${AppConfig.instance.googleMapsApiKey}',
       );
-      final resp = await http.get(uri).timeout(const Duration(milliseconds: 1500));
+      final resp = await http.get(uri).timeout(const Duration(seconds: 8));
       if (resp.statusCode != 200) {
         return _withCoords(base,
             address: 'Geocoding error ${resp.statusCode}');
@@ -86,7 +86,7 @@ class GeocodingService {
       final resp = await http.get(
         uri,
         headers: {'User-Agent': 'CIRO-Crisis-Response-App'},
-      ).timeout(const Duration(milliseconds: 1500));
+      ).timeout(const Duration(seconds: 8));
 
       if (resp.statusCode != 200) {
         return _withCoords(base, address: 'OSM Geocoding error ${resp.statusCode}');
@@ -147,11 +147,11 @@ class GeocodingService {
 
     if (finalArea.isEmpty) {
       if (finalCity.toLowerCase().contains('islamabad')) {
-        finalArea = 'G-10';
+        finalArea = 'H-13';
       } else if (finalCity.toLowerCase().contains('rawalpindi')) {
         finalArea = 'Awan Town';
       } else {
-        finalArea = 'G-10';
+        finalArea = 'H-13';
         finalCity = 'Islamabad';
       }
     }
@@ -159,16 +159,29 @@ class GeocodingService {
     // Clean up names if they are too generic
     if (finalArea.toLowerCase() == finalCity.toLowerCase()) {
       if (finalCity.toLowerCase().contains('islamabad')) {
-        finalArea = 'G-10';
+        finalArea = 'H-13';
       } else {
         finalArea = 'Awan Town';
       }
     }
 
+    String finalAddress = address;
+    if (finalAddress.isEmpty ||
+        finalAddress.toLowerCase().contains('failed') ||
+        finalAddress.toLowerCase().contains('error') ||
+        finalAddress.toLowerCase().contains('status')) {
+      finalAddress = base.address.isNotEmpty &&
+              !base.address.toLowerCase().contains('failed') &&
+              !base.address.toLowerCase().contains('error') &&
+              !base.address.toLowerCase().contains('status')
+          ? base.address
+          : '$finalArea, $finalCity, ${country.isNotEmpty ? country : "Pakistan"}';
+    }
+
     return LocationResult(
       latitude:     base.latitude,
       longitude:    base.longitude,
-      address:      address.isNotEmpty ? address : base.address,
+      address:      finalAddress,
       area:         finalArea,
       city:         finalCity,
       country:      country.isNotEmpty ? country : base.country,

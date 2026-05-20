@@ -11,6 +11,7 @@ import '../services/app_mode_service.dart';
 import '../services/notification_service.dart';
 import '../services/scenario_engine.dart';
 import '../services/user_profile_service.dart';
+import '../services/places_service.dart';
 import '../theme/typography.dart';
 import '../data/mock_crises.dart';
 
@@ -108,32 +109,118 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _showShelters() {
+    final isDemo = AppModeService.instance.isDemoMode;
+
+    if (isDemo) {
+      // Demo mode: hardcoded G-10 shelters
+      _showActionSheet(
+        title: 'Nearby Shelters',
+        subtitle: 'Demo relief sites around G-10 Islamabad.',
+        icon: Icons.home_work_rounded,
+        color: const Color(0xFF7C3AED),
+        children: const [
+          _SheetRow(
+            title: 'G-10 Community Center',
+            subtitle: 'Dry zone, meals, basic medical support',
+            trailing: '1.2 km',
+          ),
+          _SheetRow(
+            title: 'F-9 Sports Complex',
+            subtitle: 'Relief capacity and family holding area',
+            trailing: '3.1 km',
+          ),
+          _SheetRow(
+            title: 'PIMS Emergency Wing',
+            subtitle: 'Hospital intake and triage support',
+            trailing: '4.4 km',
+          ),
+        ],
+      );
+      return;
+    }
+
+    // Real mode: fetch from Google Places API
+    final crisis = ScenarioEngine.instance.activeCrisis;
+    final coords = RegExp(r'-?\d+\.?\d*')
+        .allMatches(crisis.coordinates)
+        .map((m) => double.tryParse(m.group(0)!))
+        .whereType<double>()
+        .toList();
+    final lat = coords.length >= 2 ? coords[0] : null;
+    final lng = coords.length >= 2 ? coords[1] : null;
+
+    if (lat == null || lng == null) {
+      _showActionSheet(
+        title: 'Nearby Facilities',
+        subtitle: 'Location unavailable. Please refresh.',
+        icon: Icons.home_work_rounded,
+        color: const Color(0xFF7C3AED),
+        children: const [
+          _SheetRow(title: 'No location data', subtitle: 'Tap refresh to update GPS location.'),
+        ],
+      );
+      return;
+    }
+
+    // Show loading then fetch
     _showActionSheet(
-      title: 'Nearby Shelters',
-      subtitle: 'Demo relief sites around G-10 Islamabad.',
+      title: 'Nearby Facilities',
+      subtitle: 'Searching hospitals, shelters, police, fire stations...',
       icon: Icons.home_work_rounded,
       color: const Color(0xFF7C3AED),
       children: const [
-        _SheetRow(
-          title: 'G-10 Community Center',
-          subtitle: 'Dry zone, meals, basic medical support',
-          trailing: '1.2 km',
-        ),
-        _SheetRow(
-          title: 'F-9 Sports Complex',
-          subtitle: 'Relief capacity and family holding area',
-          trailing: '3.1 km',
-        ),
-        _SheetRow(
-          title: 'PIMS Emergency Wing',
-          subtitle: 'Hospital intake and triage support',
-          trailing: '4.4 km',
-        ),
+        _SheetRow(title: 'Loading...', subtitle: 'Fetching from Google Places API'),
       ],
     );
+
+    PlacesService.instance.fetchNearbyPlaces(lat, lng).then((places) {
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Close loading sheet
+      if (places.isEmpty) {
+        _showActionSheet(
+          title: 'Nearby Facilities',
+          subtitle: 'No facilities found nearby. Check Places API key.',
+          icon: Icons.home_work_rounded,
+          color: const Color(0xFF7C3AED),
+          children: const [
+            _SheetRow(title: 'No results', subtitle: 'Google Places API returned no nearby facilities.'),
+          ],
+        );
+        return;
+      }
+      _showActionSheet(
+        title: 'Nearby Facilities',
+        subtitle: '${places.length} real facilities within 5 km of ${crisis.location}.',
+        icon: Icons.home_work_rounded,
+        color: const Color(0xFF7C3AED),
+        children: places.take(10).map((p) => _SheetRow(
+          title: '${p.typeLabel}: ${p.name}',
+          subtitle: '${p.address}${p.isOpen == true ? ' • Open' : p.isOpen == false ? ' • Closed' : ''}${p.rating != null ? ' • ★${p.rating!.toStringAsFixed(1)}' : ''}',
+          trailing: p.distanceLabel,
+        )).toList(),
+      );
+    });
   }
 
   void _showLocationPreview() {
+    final engine = ScenarioEngine.instance;
+    final crisis = engine.activeCrisis;
+    final isDemo = AppModeService.instance.isDemoMode;
+
+    // Parse coordinates dynamically
+    final matches = RegExp(r'-?\d+\.?\d*')
+        .allMatches(crisis.coordinates)
+        .map((m) => double.tryParse(m.group(0)!))
+        .whereType<double>()
+        .toList();
+    final double lat = matches.length >= 2 ? matches[0] : 33.6946;
+    final double lng = matches.length >= 2 ? matches[1] : 73.0179;
+
+    final locationTitle = isDemo ? 'Demo Location' : 'Live GPS Location';
+    final locationSubtitle = isDemo
+        ? 'G-10, Islamabad boundary preview. Change location from Settings.'
+        : 'Active location: ${crisis.location}. Managed dynamically via device GPS.';
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -160,18 +247,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'Demo Location',
-                  style: TextStyle(
+                Text(
+                  locationTitle,
+                  style: const TextStyle(
                     color: Color(0xFF111827),
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  'G-10, Islamabad boundary preview. Change location from Settings.',
-                  style: TextStyle(
+                Text(
+                  locationSubtitle,
+                  style: const TextStyle(
                     color: Color(0xFF64748B),
                     fontSize: 12.5,
                     height: 1.35,
@@ -184,8 +271,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: SizedBox(
                     height: 280,
                     child: createInteractiveMap(
-                      latitude: 33.6946,
-                      longitude: 73.0179,
+                      latitude: lat,
+                      longitude: lng,
                       zoom: 15,
                       selectedLayer: 'Flood Risk',
                       showRiskZone: true,
@@ -372,6 +459,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     const SizedBox(height: 20),
                     _BrandHeader(isDemo: isDemo),
+                    if (!isDemo && engine.isUsingFallback) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFFBEB),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFFDE68A), width: 1),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFB45309).withValues(alpha: 0.04),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(
+                              Icons.cloud_off_rounded,
+                              color: Color(0xFFD97706),
+                              size: 18,
+                            ),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Cloud AI temporarily unavailable. CIRO is using local real-signal analysis.',
+                                style: TextStyle(
+                                  color: Color(0xFF92400E),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     _ActiveRiskCard(
                       crisis: crisis,
@@ -661,6 +786,7 @@ class _BrandHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final engine = ScenarioEngine.instance;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -716,20 +842,92 @@ class _BrandHeader extends StatelessWidget {
           ],
         ),
         const Spacer(),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: const Color(0xFFEFF6FF),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
-            isDemo ? 'DEMO' : 'LIVE',
-            style: const TextStyle(
-              fontSize: 10,
-              color: Color(0xFF2563EB),
-              fontWeight: FontWeight.w900,
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (!isDemo) ...[
+              if (engine.isGeminiActive)
+                Container(
+                  margin: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: const Color(0xFFA7F3D0)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF10B981),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Text(
+                        'Gemini AI Active',
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: Color(0xFF047857),
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              if (engine.isUsingFallback)
+                Container(
+                  margin: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFF59E0B),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Text(
+                        'Local Analysis Active',
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: Color(0xFFB45309),
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                isDemo ? 'DEMO' : 'LIVE',
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: Color(0xFF2563EB),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ],
     );
@@ -2253,20 +2451,23 @@ String _signalSubtitle(SignalInput signal) {
     if (rain != null) return '${rain.group(1)} mm';
   }
   if (signal.source == SignalSource.trafficData) {
-    if (cleaned.contains('G-10')) return 'G-10 Markaz\n3 zones';
-    if (cleaned.contains('Delay:')) return cleaned;
+    if (cleaned.contains('Delay:') || cleaned.contains('delay')) return cleaned;
+    // Extract congestion label from live data
+    if (cleaned.toLowerCase().contains('congestion')) return cleaned;
   }
   return cleaned;
 }
 
 String _distanceText(Crisis crisis) {
-  if (crisis.location.toLowerCase().contains('g-10')) return '2.4 km away';
   return 'Nearby';
 }
 
 List<_HomeReport> _homeReports(Crisis crisis, DemoScenario scenario) {
   final location = crisis.location;
-  if (crisis.type == CrisisType.urbanFlooding) {
+  final isDemo = AppModeService.instance.isDemoMode;
+
+  // Demo mode only: show hardcoded G-10 flood scenario reports
+  if (isDemo && crisis.type == CrisisType.urbanFlooding) {
     return [
       _HomeReport(
         icon: Icons.water_drop_rounded,

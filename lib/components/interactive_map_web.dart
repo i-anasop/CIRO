@@ -46,7 +46,7 @@ Widget createInteractiveMap({
       Positioned(
         top: 12,
         left: 12,
-        child: _MapBadge(label: _label(selectedLayer)),
+        child: _MapBadge(label: _label(latitude, longitude)),
       ),
     ],
   );
@@ -76,7 +76,11 @@ String _query(double latitude, double longitude, String selectedLayer) {
   return '$latitude,$longitude';
 }
 
-String _label(String selectedLayer) => 'G-10';
+String _label(double latitude, double longitude) {
+  final isG10 =
+      (latitude - 33.6946).abs() < 0.03 && (longitude - 73.0179).abs() < 0.03;
+  return isG10 ? 'G-10' : 'Live Sector';
+}
 
 class _MapBadge extends StatelessWidget {
   final String label;

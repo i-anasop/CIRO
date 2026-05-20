@@ -25,6 +25,8 @@ dependencies:
   google_maps_flutter: ^2.17.0
   shared_preferences: ^2.5.5
   google_sign_in: ^6.2.2
+  web: ^1.1.0                   # Modern browser APIs (replaces dart:html)
+  google_generative_ai: ^0.4.6  # Gemini AI for real agentic pipeline
 
 dev_dependencies:
   flutter_test:

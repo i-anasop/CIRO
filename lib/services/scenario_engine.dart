@@ -18,10 +18,13 @@ import '../models/weather_result.dart';
 import '../models/route_result.dart';
 import '../models/orchestration_models.dart';
 import '../agents/agent_pipeline.dart';
+import '../agents/gemini_agent_pipeline.dart';
+import '../services/gemini_service.dart';
 import '../services/real_signal_service.dart';
 import '../services/notification_service.dart';
 import '../services/location_service.dart';
 import '../services/real_scenario_adapter.dart';
+import '../services/app_config.dart';
 
 class ScenarioEngine extends ChangeNotifier {
   // ── Singleton ─────────────────────────────────────────────────────────────
@@ -32,6 +35,13 @@ class ScenarioEngine extends ChangeNotifier {
   late PipelineResult _currentResult;
   String _activeScenarioId = 'SCN-001';
   bool _isRunning = false;
+  bool _isGeminiActive = false;
+  bool _isUsingFallback = false;
+  final List<String> _internalDebugLogs = [];
+
+  bool get isGeminiActive => _isGeminiActive;
+  bool get isUsingFallback => _isUsingFallback;
+  List<String> get internalDebugLogs => _internalDebugLogs;
 
   // ── Init ──────────────────────────────────────────────────────────────────
   void initialize() {
@@ -162,6 +172,9 @@ class ScenarioEngine extends ChangeNotifier {
 
   /// Resets the engine state to a pristine signal monitoring baseline.
   void resetRealAnalysis() {
+    _isGeminiActive = false;
+    _isUsingFallback = false;
+    _internalDebugLogs.clear();
     final pristineScenario = DemoScenario(
       id: 'SCN-REAL',
       title: 'Active Signal Monitoring',
@@ -200,37 +213,86 @@ class ScenarioEngine extends ChangeNotifier {
   }
 
   /// Triggers a live signal analysis by fetching GPS, reverse geocoding, querying APIs,
-  /// converting the results into a scenario, and running the agentic pipeline.
+  /// and running the Gemini AI agent pipeline (or deterministic fallback).
   Future<void> runRealSignalAnalysis({double? latitude, double? longitude, String? area}) async {
     _isRunning = true;
     notifyListeners();
 
-    double? lat = latitude;
-    double? lng = longitude;
-    if (lat == null || lng == null) {
-      final loc = await LocationService.instance.getCurrentLocation();
-      lat = loc.latitude;
-      lng = loc.longitude;
+    try {
+      _internalDebugLogs.clear();
+      GeminiService.instance.resetLastCallStatus();
+
+      // Check key configuration
+      final hasKey = AppConfig.instance.hasGeminiKey;
+      _internalDebugLogs.add("Gemini key configured: ${hasKey ? 'yes' : 'no'}");
+
+      double? lat = latitude;
+      double? lng = longitude;
+      if (lat == null || lng == null) {
+        final loc = await LocationService.instance.getCurrentLocation();
+        lat = loc.latitude;
+        lng = loc.longitude;
+      }
+
+      // 1. Fetch all real signals (weather, news, traffic in parallel)
+      final bundle = await RealSignalService.instance.fetchAll(
+        useMockLocation: lat == null || lng == null,
+        latitude: lat,
+        longitude: lng,
+      );
+
+      _activeScenarioId = 'SCN-REAL';
+
+      // Try a lightweight Gemini test call first to verify key health
+      bool geminiWorks = false;
+      if (GeminiService.instance.isAvailable) {
+        _internalDebugLogs.add("Gemini test initiated...");
+        final testResult = await GeminiService.instance.generateText('Ping');
+        if (testResult != null && GeminiService.instance.lastCallSucceeded) {
+          geminiWorks = true;
+          _isGeminiActive = true;
+          _isUsingFallback = false;
+          _internalDebugLogs.add("Gemini test passed");
+        } else {
+          geminiWorks = false;
+          _isGeminiActive = false;
+          _isUsingFallback = true;
+          _internalDebugLogs.add("Gemini failed - fallback activated");
+        }
+      } else {
+        _isGeminiActive = false;
+        _isUsingFallback = true;
+        _internalDebugLogs.add("Gemini key unavailable - fallback activated");
+      }
+
+      // 2. Route to Gemini AI pipeline if available & working, else Local Agentic Fallback
+      if (geminiWorks) {
+        debugPrint('[ScenarioEngine] Running Gemini AI pipeline...');
+        _currentResult = await GeminiAgentPipeline.run(bundle);
+        debugPrint('[ScenarioEngine] Gemini AI pipeline complete.');
+        
+        // Double check in case any sub-agent call set lastCallSucceeded to false
+        if (!GeminiService.instance.lastCallSucceeded) {
+          _isGeminiActive = false;
+          _isUsingFallback = true;
+          _internalDebugLogs.add("Gemini sub-agent failed during run - fallback active next cycle");
+        }
+      } else {
+        debugPrint('[ScenarioEngine] Gemini unavailable — using Local Agentic Fallback Mode (deterministic pipeline).');
+        final scenario = _toDemoScenario(bundle);
+        _currentResult = _runPipeline(scenario);
+      }
+
+      _isRunning = false;
+      notifyListeners();
+
+      // 3. Trigger notifications based on crisis severity and conditions
+      _triggerNotificationsForRealMode(bundle);
+    } catch (e) {
+      debugPrint('[ScenarioEngine] Real analysis error: $e');
+      _isRunning = false;
+      notifyListeners();
     }
-
-    // 1. Fetch all real signals (automatically handles key validation and OSM/mock coordinates fallbacks)
-    final bundle = await RealSignalService.instance.fetchAll(
-      useMockLocation: lat == null || lng == null,
-      latitude: lat,
-      longitude: lng,
-    );
-
-    // 2. Map bundle to DemoScenario
-    final scenario = _toDemoScenario(bundle);
-
-    // 3. Run all 9 agents on this scenario
-    _activeScenarioId = 'SCN-REAL';
-    _currentResult = _runPipeline(scenario);
-    _isRunning = false;
-    notifyListeners();
-
-    // 4. Trigger notifications if relevant
-    _triggerNotificationsForRealMode(bundle);
   }
 
   /// Maps a live RealSignalBundle into a DemoScenario for agent consumption.
@@ -584,13 +646,20 @@ class ScenarioEngine extends ChangeNotifier {
       details: 'Signal integration completed for ${bundle.location.displayLabel}. Fused ${bundle.signalCount} active signals from Weather, Routes, and News APIs.',
     );
 
-    // 2. High severity weather alert
+    // 2. High severity weather alert (rain/flood)
     final weather = bundle.weather;
     if (weather != null && weather.isSuccess) {
       if (weather.alertLevel == WeatherRisk.heavyRain || weather.alertLevel == WeatherRisk.floodRisk || weather.rainfallLastHour > 15.0) {
         NotificationService.instance.addNotification(
           title: '🚨 CRITICAL: Heavy Rainfall Warning',
           details: 'OpenWeather reports extreme precipitation (${weather.rainfallLabel}) in ${bundle.location.city}. Elevated risk of urban flooding and drainage capacity failure within 1-2 hours.',
+        );
+      }
+      // 2b. Heatwave alert
+      if (weather.alertLevel == WeatherRisk.heatwave || weather.temperature >= 42) {
+        NotificationService.instance.addNotification(
+          title: '🚨 CRITICAL: Heatwave Alert',
+          details: 'Temperature ${weather.temperatureLabel} (feels like ${weather.feelsLikeLabel}) in ${bundle.location.city}. Health advisory: seek shade, stay hydrated, avoid outdoor activity.',
         );
       }
     }
@@ -606,11 +675,20 @@ class ScenarioEngine extends ChangeNotifier {
       }
     }
 
-    // 4. Confirmed crisis warning
+    // 4. High/Critical severity crisis detected
     if (_currentResult.crisis.severity == SeverityLevel.high || _currentResult.crisis.severity == SeverityLevel.critical) {
       NotificationService.instance.addNotification(
         title: '🚨 Verified Incident: ${_currentResult.crisis.title}',
         details: 'Multi-agent correlation confirms an active ${_classificationLabel(_currentResult.crisis.type)} crisis at ${_currentResult.crisis.location}. Recommended safety protocols activated.',
+      );
+    }
+
+    // 5. Confirmed verification status
+    if (_currentResult.verification.type == VerificationType.confirmed) {
+      NotificationService.instance.addNotificationWithId(
+        id: 'VERIFIED-${DateTime.now().millisecondsSinceEpoch}',
+        title: '✅ Crisis Confirmed by AI Verification',
+        details: '${_currentResult.verification.label}: ${_currentResult.verification.note}',
       );
     }
   }

@@ -244,7 +244,9 @@ class _MapScreenState extends State<MapScreen> {
                 Text('Map Controls', style: CiroTypography.headingSmall),
                 const SizedBox(height: 4),
                 Text(
-                  'Google Maps shows the searched G-10 boundary. Filters change the map search context.',
+                  AppModeService.instance.isDemoMode
+                      ? 'Google Maps shows the searched G-10 boundary. Filters change the map search context.'
+                      : 'Live situation map with real-time overlays. Filters change the map search context.',
                   style: CiroTypography.bodySmall,
                 ),
                 const SizedBox(height: 16),

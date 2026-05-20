@@ -129,7 +129,6 @@ Primary screens:
 | App framework | Flutter |
 | Language | Dart `^3.10.8` |
 | Routing | `go_router` |
-| Authentication | Google Sign-In (`google_sign_in` / Google Identity Services) |
 | State pattern | Singleton services with `ListenableBuilder` |
 | Local persistence | `shared_preferences` |
 | Environment config | `flutter_dotenv` |
@@ -508,18 +507,9 @@ Create a root `.env` file:
 GOOGLE_MAPS_API_KEY=your_google_maps_or_routes_key
 OPENWEATHER_API_KEY=your_openweather_key
 NEWS_API_KEY=your_newsapi_key
-GOOGLE_CLIENT_ID=your_google_oauth_client_id.apps.googleusercontent.com
 ```
 
-The app still runs without keys. Demo Mode is fully functional offline. If `GOOGLE_CLIENT_ID` is missing from the environment, you can dynamically configure it using the in-app bottom sheet setup guide.
-
-### Google Sign-In Setup
-
-To authenticate using Google:
-1. Enable the **People API** in your project from the [Google Cloud Console Library](https://console.cloud.google.com/apis/library/people.googleapis.com).
-2. Create an **OAuth Client ID** for Web Applications in your Google Cloud Console Credentials page.
-3. Add your development URL (e.g., `http://localhost:53052`) under **Authorized JavaScript Origins**.
-4. Set the `GOOGLE_CLIENT_ID` key in your `.env` file.
+The app still runs without keys. Demo Mode is fully functional offline.
 
 ### Run Web
 

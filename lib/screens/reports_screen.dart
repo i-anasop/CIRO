@@ -5,6 +5,7 @@ import '../services/location_service.dart';
 import '../services/scenario_engine.dart';
 import '../services/user_profile_service.dart';
 import '../services/post_database_service.dart';
+import '../services/app_mode_service.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -25,7 +26,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
   bool _photoAttached = false;
   bool _locationAttached = false;
   bool _analyzing = false;
-  String _locationLabel = 'G-10, Islamabad';
+  String _locationLabel = AppModeService.instance.isDemoMode
+      ? 'G-10, Islamabad'
+      : ScenarioEngine.instance.activeCrisis.location;
   double _lat = 33.6946;
   double _lng = 73.0179;
 
@@ -220,7 +223,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
       _analyzing = false;
       _photoAttached = false;
       _locationAttached = false;
-      _locationLabel = 'G-10, Islamabad';
+      _locationLabel = AppModeService.instance.isDemoMode
+          ? 'G-10, Islamabad'
+          : ScenarioEngine.instance.activeCrisis.location;
       _postController.text = template.prompt;
     });
   }
