@@ -24,11 +24,13 @@ class AppConfig {
   String get _googleMapsKey  => dotenv.maybeGet('GOOGLE_MAPS_API_KEY')  ?? '';
   String get _openWeatherKey => dotenv.maybeGet('OPENWEATHER_API_KEY')  ?? '';
   String get _newsApiKey     => dotenv.maybeGet('NEWS_API_KEY')         ?? '';
+  String get _geminiApiKey   => dotenv.maybeGet('GEMINI_API_KEY')       ?? '';
 
   /// Returns key only for internal service use — never pass to UI.
   String get googleMapsApiKey  => _googleMapsKey;
   String get openWeatherApiKey => _openWeatherKey;
   String get newsApiKey        => _newsApiKey;
+  String get geminiApiKey      => _geminiApiKey;
 
   // ── Readiness flags ───────────────────────────────────────────────────────
   bool get hasGoogleMapsKey =>
@@ -43,9 +45,13 @@ class AppConfig {
       _newsApiKey.isNotEmpty &&
       !_newsApiKey.contains('PASTE_YOUR');
 
-  /// Real Mode is fully available only when all 3 keys are present.
+  bool get hasGeminiKey =>
+      _geminiApiKey.isNotEmpty &&
+      !_geminiApiKey.contains('PASTE_YOUR');
+
+  /// Real Mode is fully available only when Gemini + at least one signal key present.
   bool get isRealModeAvailable =>
-      hasGoogleMapsKey && hasOpenWeatherKey && hasNewsApiKey;
+      hasGeminiKey && (hasGoogleMapsKey || hasOpenWeatherKey || hasNewsApiKey);
 
   /// Real Mode is partially available with at least one key.
   bool get isRealModePartial =>

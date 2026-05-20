@@ -4,11 +4,14 @@
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../components/interactive_map_helper.dart';
 import '../services/app_mode_service.dart';
 import '../services/user_profile_service.dart';
 import '../services/scenario_engine.dart';
 import '../services/notification_service.dart';
+import '../services/location_service.dart';
+import '../services/geocoding_service.dart';
 import '../components/settings_sheets.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -46,6 +49,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _showChangeLocationSheet() {
     final service = AppModeService.instance;
+    final crisis = ScenarioEngine.instance.activeCrisis;
+
+    // Parse current coordinates dynamically
+    final matches = RegExp(r'-?\d+\.?\d*')
+        .allMatches(crisis.coordinates)
+        .map((m) => double.tryParse(m.group(0)!))
+        .whereType<double>()
+        .toList();
+    final double lat = matches.length >= 2 ? matches[0] : 33.6428;
+    final double lng = matches.length >= 2 ? matches[1] : 72.9730;
+
+    bool isUpdating = false;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -54,89 +70,215 @@ class _SettingsScreenState extends State<SettingsScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
       builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE2E8F0),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Change Location',
-                  style: TextStyle(
-                    color: Color(0xFF111827),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                const Text(
-                  'Choose demo G-10 or refresh using your current live location.',
-                  style: TextStyle(
-                    color: Color(0xFF64748B),
-                    fontSize: 12.5,
-                    height: 1.35,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: SizedBox(
-                    height: 210,
-                    child: createInteractiveMap(
-                      latitude: 33.6946,
-                      longitude: 73.0179,
-                      zoom: 15,
-                      selectedLayer: 'Flood Risk',
-                      showRiskZone: true,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Row(
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 14, 18, 22),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          _activateDemoMode(service);
-                          Navigator.of(context).pop();
-                        },
-                        icon: const Icon(Icons.location_city_rounded, size: 17),
-                        label: const Text('Use G-10 Demo'),
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE2E8F0),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () async {
-                          Navigator.of(context).pop();
-                          await _activateRealMode(service);
-                        },
-                        icon: const Icon(Icons.my_location_rounded, size: 17),
-                        label: const Text('Use Live Location'),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Update Live Location',
+                      style: TextStyle(
+                        color: Color(0xFF111827),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    const Text(
+                      'Retrieve latest GPS signals and reverse geocode address.',
+                      style: TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 12.5,
+                        height: 1.35,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: SizedBox(
+                        height: 210,
+                        child: createInteractiveMap(
+                          latitude: lat,
+                          longitude: lng,
+                          zoom: 15,
+                          selectedLayer: 'Flood Risk',
+                          showRiskZone: true,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.my_location_rounded, color: Color(0xFF4F46E5), size: 18),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'CURRENT ACTIVE LOCATION',
+                                  style: TextStyle(
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF4F46E5),
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  crisis.location,
+                                  style: const TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                                const SizedBox(height: 1),
+                                Text(
+                                  'Coordinates: ${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}',
+                                  style: const TextStyle(
+                                    fontSize: 10.5,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: isUpdating
+                            ? null
+                            : () async {
+                                setSheetState(() => isUpdating = true);
+                                try {
+                                  final locResult = await LocationService.instance.getCurrentLocation();
+                                  if (locResult.isSuccess && locResult.latitude != null && locResult.longitude != null) {
+                                    final geocoded = await GeocodingService.instance.reverseGeocode(locResult);
+                                    ScenarioEngine.instance.overrideLocation(
+                                      geocoded.displayLabel,
+                                      lat: geocoded.latitude,
+                                      lng: geocoded.longitude,
+                                    );
+                                    service.setDemoMode(false);
+                                    await ScenarioEngine.instance.runRealSignalAnalysis(
+                                      latitude: geocoded.latitude,
+                                      longitude: geocoded.longitude,
+                                    );
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Row(
+                                            children: [
+                                              const Icon(Icons.check_circle_outline, color: Colors.white),
+                                              const SizedBox(width: 8),
+                                              Expanded(child: Text('Location updated to ${geocoded.displayLabel}')),
+                                            ],
+                                          ),
+                                          backgroundColor: const Color(0xFF10B981),
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  } else {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: const Row(
+                                            children: [
+                                              Icon(Icons.info_outline, color: Colors.white),
+                                              SizedBox(width: 8),
+                                              Expanded(child: Text('Could not fetch new coordinates. Retaining current.')),
+                                            ],
+                                          ),
+                                          backgroundColor: const Color(0xFF4F46E5),
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                } catch (e) {
+                                  debugPrint('Error updating location: $e');
+                                } finally {
+                                  setSheetState(() => isUpdating = false);
+                                  if (context.mounted) {
+                                    Navigator.of(context).pop();
+                                    setState(() {});
+                                  }
+                                }
+                              },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF111827),
                           foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 0,
                         ),
+                        child: isUpdating
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.my_location_rounded, size: 18),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Update Live Location',
+                                    style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
@@ -257,6 +399,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               child: const Text(
                 'Confirm',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showSignOutDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.logout_rounded, color: Color(0xFFFF3B30)),
+              SizedBox(width: 8),
+              Text(
+                'Sign Out?',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ],
+          ),
+          content: const Text(
+            'This will clear your local session and return you to the onboarding screen.',
+            style: TextStyle(height: 1.4, fontSize: 13.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Color(0xFF64748B)),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await UserProfileService.instance.signOut();
+                if (context.mounted) {
+                  context.go('/login');
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFF3B30),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'Sign Out',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -601,6 +801,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: () =>
                         showSettingsSheet(context, const SafetyTipsSheet()),
                   ),
+                  _buildDivider(),
+                  _PreferenceListTile(
+                    icon: Icons.logout_rounded,
+                    title: 'Sign Out',
+                    iconColor: const Color(0xFFFF3B30),
+                    iconBgColor: const Color(0xFFFEE2E2),
+                    titleColor: const Color(0xFFFF3B30),
+                    onTap: _showSignOutDialog,
+                  ),
                 ],
               ),
             ),
@@ -819,12 +1028,18 @@ class _PreferenceListTile extends StatelessWidget {
   final String title;
   final Widget? trailing;
   final VoidCallback? onTap;
+  final Color? iconColor;
+  final Color? iconBgColor;
+  final Color? titleColor;
 
   const _PreferenceListTile({
     required this.icon,
     required this.title,
     this.trailing,
     this.onTap,
+    this.iconColor,
+    this.iconBgColor,
+    this.titleColor,
   });
 
   @override
@@ -838,18 +1053,22 @@ class _PreferenceListTile extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                color: Color(0xFFEEF2FF),
+              decoration: BoxDecoration(
+                color: iconBgColor ?? const Color(0xFFEEF2FF),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: const Color(0xFF4F46E5), size: 18),
+              child: Icon(
+                icon,
+                color: iconColor ?? const Color(0xFF4F46E5),
+                size: 18,
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
-                  color: Color(0xFF0F172A),
+                style: TextStyle(
+                  color: titleColor ?? const Color(0xFF0F172A),
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),

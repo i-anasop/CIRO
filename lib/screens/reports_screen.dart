@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../services/app_mode_service.dart';
 import '../services/location_service.dart';
+import '../services/post_database_service.dart';
 import '../services/scenario_engine.dart';
 import '../services/user_profile_service.dart';
 import '../theme/colors.dart';
@@ -24,7 +26,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
   String? _attachedImageData;
   bool _locationAttached = false;
   bool _posting = false;
-  String _locationLabel = 'G-10 Markaz';
+  String _locationLabel = AppModeService.instance.isDemoMode
+      ? 'G-10 Markaz'
+      : ScenarioEngine.instance.activeCrisis.location;
   double _lat = 33.6946;
   double _lng = 73.0179;
 
@@ -71,10 +75,85 @@ class _ReportsScreenState extends State<ReportsScreen> {
     ),
   };
 
+  IconData _iconFromName(String name) {
+    switch (name) {
+      case 'water_drop': return Icons.water_drop_rounded;
+      case 'car_crash': return Icons.car_crash_rounded;
+      case 'power_off': return Icons.power_off_rounded;
+      case 'thermostat': return Icons.thermostat_rounded;
+      default: return Icons.warning_rounded;
+    }
+  }
+
+  String _nameFromIcon(IconData icon) {
+    if (icon == Icons.water_drop_rounded) return 'water_drop';
+    if (icon == Icons.car_crash_rounded) return 'car_crash';
+    if (icon == Icons.power_off_rounded) return 'power_off';
+    if (icon == Icons.thermostat_rounded) return 'thermostat';
+    return 'warning';
+  }
+
+  Color _colorFromHex(String hex) {
+    try {
+      return Color(int.parse(hex.replaceAll('#', ''), radix: 16));
+    } catch (_) {
+      return CiroColors.brand;
+    }
+  }
+
+  String _hexFromColor(Color color) {
+    return '0x${color.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase()}';
+  }
+
   @override
   void initState() {
     super.initState();
+    _postController.text = _templates[_selectedType]!.prompt;
     _posts = List<_FeedPost>.of(_seedPosts());
+    _loadPersistedPosts();
+  }
+
+  Future<void> _loadPersistedPosts() async {
+    final list = await PostDatabaseService.instance.loadPosts();
+    if (list.isEmpty) return;
+
+    final List<_FeedPost> persistedItems = [];
+    for (final map in list) {
+      final author = map['author'] ?? 'Anonymous';
+      final avatarColor = map['avatarIndex'] != null
+          ? UserProfileService.avatarColors[(map['avatarIndex'] as int).clamp(0, UserProfileService.avatarColors.length - 1)]
+          : null;
+      final avatarIcon = map['avatarIndex'] != null
+          ? UserProfileService.avatarIcons[(map['avatarIndex'] as int).clamp(0, UserProfileService.avatarIcons.length - 1)]
+          : null;
+      persistedItems.add(
+        _FeedPost(
+          id: map['timestamp']?.toString() ?? DateTime.now().microsecondsSinceEpoch.toString(),
+          author: author,
+          handle: map['handle'] ?? '@local_reporter',
+          avatarText: author.isNotEmpty ? author[0].toUpperCase() : 'A',
+          avatarColor: avatarColor,
+          avatarIcon: avatarIcon,
+          avatarImageData: map['customAvatarUrl'],
+          time: 'now',
+          title: map['title'] ?? '',
+          body: map['body'] ?? '',
+          location: map['location'] ?? '',
+          tag: map['tag'] ?? 'New',
+          icon: _iconFromName(map['iconName'] ?? ''),
+          color: _colorFromHex(map['colorHex'] ?? ''),
+          imageTone: _colorFromHex(map['colorHex'] ?? ''),
+          likes: map['likes'] ?? 0,
+          views: 1,
+          comments: const [],
+          isOfficial: false,
+        ),
+      );
+    }
+
+    setState(() {
+      _posts.insertAll(0, persistedItems);
+    });
   }
 
   @override
@@ -115,8 +194,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
     await Future.delayed(const Duration(milliseconds: 550));
     if (!mounted) return;
 
-    final template = _templates[_selectedType]!;
     final profile = UserProfileService.instance;
+    final template = _templates[_selectedType]!;
     final authorName = profile.name.trim().isEmpty
         ? 'You'
         : profile.name.trim();
@@ -154,6 +233,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
       isOfficial: false,
     );
 
+    // Save in our local DB
+    await PostDatabaseService.instance.savePost(
+      author: post.author,
+      handle: post.handle,
+      title: post.title,
+      body: post.body,
+      location: post.location,
+      tag: post.tag,
+      iconName: _nameFromIcon(post.icon),
+      colorHex: _hexFromColor(post.color),
+      avatarIndex: profile.avatarIndex,
+      customAvatarUrl: post.avatarImageData,
+      latitude: _locationAttached ? _lat : template.lat,
+      longitude: _locationAttached ? _lng : template.lng,
+    );
+
     ScenarioEngine.instance.overrideLocation(
       post.location,
       lat: _locationAttached ? _lat : template.lat,
@@ -165,7 +260,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
       _posting = false;
       _attachedImageData = null;
       _locationAttached = false;
-      _locationLabel = template.location;
+      _locationLabel = AppModeService.instance.isDemoMode
+          ? 'G-10 Markaz'
+          : ScenarioEngine.instance.activeCrisis.location;
       _postController.clear();
     });
   }
@@ -501,7 +598,10 @@ class _ComposerCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              _ProfileAvatar(profile: profile, radius: 24),
+              ListenableBuilder(
+                listenable: UserProfileService.instance,
+                builder: (context, _) => _ProfileAvatar(profile: profile, radius: 24),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: TextField(
@@ -1595,6 +1695,8 @@ class _FeedPost {
   final bool liked;
   final bool isOfficial;
   final List<_Comment> comments;
+  final int shares;
+  final int? avatarIndex;
 
   const _FeedPost({
     required this.id,
@@ -1618,9 +1720,17 @@ class _FeedPost {
     required this.comments,
     required this.isOfficial,
     this.liked = false,
+    this.shares = 0,
+    this.avatarIndex,
   });
 
-  _FeedPost copyWith({int? likes, bool? liked, List<_Comment>? comments}) {
+  _FeedPost copyWith({
+    int? likes,
+    bool? liked,
+    List<_Comment>? comments,
+    int? shares,
+    int? avatarIndex,
+  }) {
     return _FeedPost(
       id: id,
       author: author,
@@ -1643,6 +1753,8 @@ class _FeedPost {
       liked: liked ?? this.liked,
       comments: comments ?? this.comments,
       isOfficial: isOfficial,
+      shares: shares ?? this.shares,
+      avatarIndex: avatarIndex ?? this.avatarIndex,
     );
   }
 }

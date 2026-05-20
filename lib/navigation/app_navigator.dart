@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../screens/splash_screen.dart';
+import '../screens/login_screen.dart';
 import '../screens/location_screen.dart';
 import '../screens/dashboard_screen.dart';
 import '../screens/crisis_detail_screen.dart';
@@ -26,6 +27,9 @@ final GoRouter appRouter = GoRouter(
   routes: [
     // ── Splash ──────────────────────────────────────────────────────────────
     GoRoute(path: '/', builder: (_, __) => const SplashScreen()),
+
+    // ── Login ───────────────────────────────────────────────────────────────
+    GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
 
     // ── Location ────────────────────────────────────────────────────────────
     GoRoute(path: '/location', builder: (_, __) => const LocationScreen()),

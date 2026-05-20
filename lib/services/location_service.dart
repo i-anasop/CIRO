@@ -1,10 +1,16 @@
 // CIRO — Location Service
-// Uses geolocator to get real GPS coordinates.
-// Handles permission denial, GPS unavailability, and web gracefully.
+// Uses dart:html navigator.geolocation directly on web (not geolocator)
+// because geolocator's timeLimit is ignored on web and silently times out.
+// Falls back to Geolocator on native platforms (Android/iOS).
 // Always returns a typed LocationResult — never throws.
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:geolocator/geolocator.dart';
 import '../models/location_result.dart';
+
+// Web-only imports via conditional import
+import 'location_service_web.dart'
+    if (dart.library.io) 'location_service_native.dart' as platform;
 
 class LocationService {
   // ── Singleton ─────────────────────────────────────────────────────────────
@@ -12,41 +18,35 @@ class LocationService {
   LocationService._();
 
   /// Request permission and fetch current position.
-  /// Falls back gracefully on every failure path.
+  /// On web: uses browser navigator.geolocation directly.
+  /// On native: uses geolocator package.
   Future<LocationResult> getCurrentLocation() async {
+    if (kIsWeb) {
+      return platform.getCurrentLocationPlatform();
+    }
+    return _getNativeLocation();
+  }
+
+  Future<LocationResult> _getNativeLocation() async {
     try {
-      // 1. Check if location services are enabled
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        throw Exception('Location services are disabled.');
+        return _fallback('Location services are disabled on this device.');
       }
 
-      // 2. Check and request permission
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
-        throw Exception('Location permission denied.');
+        return _fallback('Location permission denied.');
       }
 
-      // 3. Fast path: check last known position first (instantly available)
-      final lastPos = await Geolocator.getLastKnownPosition();
-      if (lastPos != null) {
-        return LocationResult(
-          latitude:  lastPos.latitude,
-          longitude: lastPos.longitude,
-          isMock:    false,
-          isSuccess: true,
-        );
-      }
-
-      // 4. Fallback to low accuracy getCurrentPosition with a very short 1.5s timeout
       final pos = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.low, // Fast and energy efficient
-          timeLimit: Duration(milliseconds: 1500),
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 15),
         ),
       );
 
@@ -57,19 +57,22 @@ class LocationService {
         isSuccess: true,
       );
     } catch (e) {
-      // Fast fallback to Islamabad coordinates when permission denied, timeout, or blocked
-      return LocationResult(
-        latitude:  33.6200,
-        longitude: 73.0000,
-        address:   'Fallback location near Islamabad, Pakistan',
-        area:      'Islamabad fallback',
-        city:      'Islamabad',
-        country:   'Pakistan',
-        isMock:    true,
-        isSuccess: true,
-        errorMessage: 'GPS fallback used: ${e.runtimeType}',
-      );
+      return _fallback('Native GPS error: $e');
     }
+  }
+
+  LocationResult _fallback(String reason) {
+    return LocationResult(
+      latitude:     33.6428,
+      longitude:    72.9730,
+      address:      'H-13, Islamabad, Pakistan',
+      area:         'H-13',
+      city:         'Islamabad',
+      country:      'Pakistan',
+      isMock:       true,
+      isSuccess:    true,
+      errorMessage: reason,
+    );
   }
 
   /// Returns mock Islamabad G-10 coordinates instantly.

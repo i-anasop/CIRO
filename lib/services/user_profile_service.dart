@@ -24,6 +24,18 @@ class UserProfileService extends ChangeNotifier {
   int get avatarIndex => _avatarIndex;
   String? get customAvatarUrl => _customAvatarUrl;
 
+  bool get isLoggedIn => _email.isNotEmpty || _name.isNotEmpty;
+
+  Future<void> signOut() async {
+    await updateProfile(
+      name: '',
+      role: '',
+      email: '',
+      avatarIndex: 0,
+      customAvatarUrl: null,
+    );
+  }
+
   // Predefined gorgeous premium colors and icons for profiles
   static final List<Color> avatarColors = [
     const Color(0xFF4F46E5), // Royal Indigo
