@@ -128,6 +128,7 @@ Primary screens:
 | --- | --- |
 | App framework | Flutter |
 | Language | Dart `^3.10.8` |
+| Authentication | `google_sign_in` (Web/Mobile with Google Identity Services) |
 | Routing | `go_router` |
 | State pattern | Singleton services with `ListenableBuilder` |
 | Local persistence | `shared_preferences` |
@@ -507,7 +508,17 @@ Create a root `.env` file:
 GOOGLE_MAPS_API_KEY=your_google_maps_or_routes_key
 OPENWEATHER_API_KEY=your_openweather_key
 NEWS_API_KEY=your_newsapi_key
+GOOGLE_CLIENT_ID=your_google_oauth_client_id_for_web
 ```
+
+### Google Authentication Configuration
+
+CIRO integrates official Google Sign-In for crisis responders:
+
+1. **OAuth Client ID**: Create a "Web application" client ID in the [Google Cloud Console Credentials Screen](https://console.cloud.google.com/apis/credentials).
+2. **Authorized JavaScript Origins**: Add your local test URI (e.g. `http://localhost:53052` or the port you run Flutter on) to the authorized origins list.
+3. **Enable People API**: Search and enable the [Google People API](https://console.cloud.google.com/apis/library/people.googleapis.com) in your project to allow the app to resolve user avatar photos and display names.
+4. **Fallback Mode**: If the People API is not enabled on your Google Cloud Console project, CIRO's login flow will automatically fall back to email-only scopes gracefully without throwing blocking connection errors.
 
 The app still runs without keys. Demo Mode is fully functional offline.
 

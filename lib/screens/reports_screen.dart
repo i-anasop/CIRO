@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 
 import '../services/location_service.dart';
 import '../services/scenario_engine.dart';
+import '../services/user_profile_service.dart';
+import '../services/post_database_service.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -70,10 +72,72 @@ class _ReportsScreenState extends State<ReportsScreen> {
     ),
   };
 
+  IconData _iconFromName(String name) {
+    switch (name) {
+      case 'water_drop': return Icons.water_drop_rounded;
+      case 'car_crash': return Icons.car_crash_rounded;
+      case 'power_off': return Icons.power_off_rounded;
+      case 'thermostat': return Icons.thermostat_rounded;
+      default: return Icons.warning_rounded;
+    }
+  }
+
+  String _nameFromIcon(IconData icon) {
+    if (icon == Icons.water_drop_rounded) return 'water_drop';
+    if (icon == Icons.car_crash_rounded) return 'car_crash';
+    if (icon == Icons.power_off_rounded) return 'power_off';
+    if (icon == Icons.thermostat_rounded) return 'thermostat';
+    return 'warning';
+  }
+
+  Color _colorFromHex(String hex) {
+    try {
+      return Color(int.parse(hex.replaceAll('#', ''), radix: 16));
+    } catch (_) {
+      return _brand;
+    }
+  }
+
+  String _hexFromColor(Color color) {
+    return '0x${color.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase()}';
+  }
+
   @override
   void initState() {
     super.initState();
     _postController.text = _templates[_selectedType]!.prompt;
+    _loadPersistedPosts();
+  }
+
+  Future<void> _loadPersistedPosts() async {
+    final list = await PostDatabaseService.instance.loadPosts();
+    if (list.isEmpty) return;
+
+    final List<_FeedItem> persistedItems = [];
+    for (final map in list) {
+      persistedItems.add(
+        _FeedItem(
+          author: map['author'] ?? 'Anonymous',
+          handle: map['handle'] ?? '@local_reporter',
+          time: 'now',
+          title: map['title'] ?? '',
+          body: map['body'] ?? '',
+          location: map['location'] ?? '',
+          tag: map['tag'] ?? 'New',
+          icon: _iconFromName(map['iconName'] ?? ''),
+          color: _colorFromHex(map['colorHex'] ?? ''),
+          likes: map['likes'] ?? 0,
+          comments: map['comments'] ?? 0,
+          shares: map['shares'] ?? 0,
+          avatarIndex: map['avatarIndex'],
+          customAvatarUrl: map['customAvatarUrl'],
+        ),
+      );
+    }
+
+    setState(() {
+      _feed.insertAll(0, persistedItems);
+    });
   }
 
   @override
@@ -108,10 +172,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
     await Future.delayed(const Duration(milliseconds: 700));
     if (!mounted) return;
 
+    final profile = UserProfileService.instance;
     final template = _templates[_selectedType]!;
     final item = _FeedItem(
-      author: 'You',
-      handle: '@local_reporter',
+      author: profile.name.isNotEmpty ? profile.name : 'You',
+      handle: profile.email.isNotEmpty
+          ? '@${profile.email.split('@')[0]}'
+          : '@local_responder',
       time: 'now',
       title: template.title,
       body: text,
@@ -122,6 +189,24 @@ class _ReportsScreenState extends State<ReportsScreen> {
       likes: 0,
       comments: 0,
       shares: 0,
+      avatarIndex: profile.avatarIndex,
+      customAvatarUrl: profile.customAvatarUrl,
+    );
+
+    // Save in our local DB
+    await PostDatabaseService.instance.savePost(
+      author: item.author,
+      handle: item.handle,
+      title: item.title,
+      body: item.body,
+      location: item.location,
+      tag: item.tag,
+      iconName: _nameFromIcon(item.icon),
+      colorHex: _hexFromColor(item.color),
+      avatarIndex: item.avatarIndex,
+      customAvatarUrl: item.customAvatarUrl,
+      latitude: _locationAttached ? _lat : template.lat,
+      longitude: _locationAttached ? _lng : template.lng,
     );
 
     ScenarioEngine.instance.overrideLocation(
@@ -277,10 +362,33 @@ class _ComposerCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const CircleAvatar(
-                radius: 19,
-                backgroundColor: Color(0xFF5A5CE5),
-                child: Icon(Icons.person_rounded, color: Colors.white),
+              ListenableBuilder(
+                listenable: UserProfileService.instance,
+                builder: (context, _) {
+                  final profile = UserProfileService.instance;
+                  return Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: profile.customAvatarUrl != null
+                          ? Colors.transparent
+                          : UserProfileService.avatarColors[profile.avatarIndex],
+                    ),
+                    child: profile.customAvatarUrl != null
+                        ? ClipOval(
+                            child: Image.network(
+                              profile.customAvatarUrl!,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : Icon(
+                            UserProfileService.avatarIcons[profile.avatarIndex],
+                            color: Colors.white,
+                            size: 19,
+                          ),
+                  );
+                },
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -461,10 +569,33 @@ class _SocialPostCardState extends State<_SocialPostCard> {
         children: [
           Row(
             children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: item.color.withValues(alpha: 0.12),
-                child: Icon(item.icon, color: item.color, size: 20),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: item.color.withValues(alpha: 0.12),
+                ),
+                child: item.customAvatarUrl != null
+                    ? ClipOval(
+                        child: Image.network(
+                          item.customAvatarUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Icon(item.icon, color: item.color, size: 20),
+                        ),
+                      )
+                    : (item.avatarIndex != null
+                        ? ClipOval(
+                            child: Container(
+                              color: UserProfileService.avatarColors[item.avatarIndex!],
+                              child: Icon(
+                                UserProfileService.avatarIcons[item.avatarIndex!],
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                          )
+                        : Icon(item.icon, color: item.color, size: 20)),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -1053,6 +1184,8 @@ class _FeedItem {
   final int likes;
   final int comments;
   final int shares;
+  final int? avatarIndex;
+  final String? customAvatarUrl;
 
   const _FeedItem({
     required this.author,
@@ -1067,6 +1200,8 @@ class _FeedItem {
     required this.likes,
     required this.comments,
     required this.shares,
+    this.avatarIndex,
+    this.customAvatarUrl,
   });
 }
 

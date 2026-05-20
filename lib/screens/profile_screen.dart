@@ -281,7 +281,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Manage your CIRO operator identity',
+                      'Manage your CIRO responder identity',
                       style: TextStyle(
                         color: subtitleColor.withValues(alpha: 0.9),
                         fontSize: 14,

@@ -10,6 +10,7 @@ import '../services/app_mode_service.dart';
 import '../services/location_service.dart';
 import '../services/geocoding_service.dart';
 import '../services/scenario_engine.dart';
+import '../services/user_profile_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -88,7 +89,12 @@ class _SplashScreenState extends State<SplashScreen>
     }
 
     if (mounted) {
-      context.go('/location');
+      final isLoggedIn = UserProfileService.instance.isLoggedIn;
+      if (isLoggedIn) {
+        context.go('/location');
+      } else {
+        context.go('/login');
+      }
     }
   }
 

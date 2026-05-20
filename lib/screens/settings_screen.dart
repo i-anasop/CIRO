@@ -269,6 +269,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  void _showSignOutDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.logout_rounded, color: Color(0xFFFF3B30)),
+              SizedBox(width: 8),
+              Text(
+                'Sign Out?',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ],
+          ),
+          content: const Text(
+            'This will clear your local session and return you to the onboarding screen.',
+            style: TextStyle(height: 1.4, fontSize: 13.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Color(0xFF64748B)),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await UserProfileService.instance.signOut();
+                if (context.mounted) {
+                  context.go('/login');
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFF3B30),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'Sign Out',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     const bgColor = Color(0xFFF8FAFC);
@@ -601,6 +659,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: () =>
                         showSettingsSheet(context, const SafetyTipsSheet()),
                   ),
+                  _buildDivider(),
+                  _PreferenceListTile(
+                    icon: Icons.logout_rounded,
+                    title: 'Sign Out',
+                    iconColor: const Color(0xFFFF3B30),
+                    iconBgColor: const Color(0xFFFEE2E2),
+                    titleColor: const Color(0xFFFF3B30),
+                    onTap: _showSignOutDialog,
+                  ),
                 ],
               ),
             ),
@@ -819,12 +886,18 @@ class _PreferenceListTile extends StatelessWidget {
   final String title;
   final Widget? trailing;
   final VoidCallback? onTap;
+  final Color? iconColor;
+  final Color? iconBgColor;
+  final Color? titleColor;
 
   const _PreferenceListTile({
     required this.icon,
     required this.title,
     this.trailing,
     this.onTap,
+    this.iconColor,
+    this.iconBgColor,
+    this.titleColor,
   });
 
   @override
@@ -838,18 +911,22 @@ class _PreferenceListTile extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                color: Color(0xFFEEF2FF),
+              decoration: BoxDecoration(
+                color: iconBgColor ?? const Color(0xFFEEF2FF),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: const Color(0xFF4F46E5), size: 18),
+              child: Icon(
+                icon,
+                color: iconColor ?? const Color(0xFF4F46E5),
+                size: 18,
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
-                  color: Color(0xFF0F172A),
+                style: TextStyle(
+                  color: titleColor ?? const Color(0xFF0F172A),
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
