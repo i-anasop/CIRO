@@ -3,6 +3,7 @@
 // All routes preserved. Only the nav bar visual is updated.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../screens/splash_screen.dart';
 import '../screens/login_screen.dart';
@@ -20,7 +21,6 @@ import '../screens/profile_screen.dart';
 import '../models/crisis.dart';
 import '../services/scenario_engine.dart';
 import '../theme/colors.dart';
-import '../theme/typography.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
@@ -94,7 +94,7 @@ final GoRouter appRouter = GoRouter(
 );
 
 // ── Premium Floating Bottom Navigation Shell ──────────────────────────────────
-class _MainShell extends StatelessWidget {
+class _MainShell extends StatefulWidget {
   final Widget child;
   const _MainShell({required this.child});
 
@@ -125,6 +125,13 @@ class _MainShell extends StatelessWidget {
     ),
   ];
 
+  @override
+  State<_MainShell> createState() => _MainShellState();
+}
+
+class _MainShellState extends State<_MainShell> {
+  DateTime? _lastPressedAt;
+
   int _currentIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
     if (location.startsWith('/home')) return 0;
@@ -137,13 +144,52 @@ class _MainShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final current = _currentIndex(context);
-    return Scaffold(
-      backgroundColor: CiroColors.bg1,
-      body: child,
-      bottomNavigationBar: _PremiumNavBar(
-        currentIndex: current,
-        onTap: (i) => context.go(_tabs[i].path),
-        tabs: _tabs,
+    final router = GoRouter.of(context);
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+
+        // 1. If GoRouter has nested screens to pop (like crisis-detail), let it pop.
+        if (router.canPop()) {
+          router.pop();
+          return;
+        }
+
+        // 2. If we are on a different tab (not Home), navigate back to Home.
+        final location = GoRouterState.of(context).uri.toString();
+        if (location != '/home') {
+          router.go('/home');
+          return;
+        }
+
+        // 3. We are on the Home tab. Double press back to exit the app.
+        final now = DateTime.now();
+        if (_lastPressedAt == null || now.difference(_lastPressedAt!) > const Duration(seconds: 2)) {
+          _lastPressedAt = now;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Press back again to exit'),
+              duration: Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          return;
+        }
+
+        // Exit the app
+        await SystemNavigator.pop();
+      },
+      child: Scaffold(
+        backgroundColor: CiroColors.bg1,
+        extendBody: true,
+        body: widget.child,
+        bottomNavigationBar: _PremiumNavBar(
+          currentIndex: current,
+          onTap: (i) => context.go(_MainShell._tabs[i].path),
+          tabs: _MainShell._tabs,
+        ),
       ),
     );
   }
@@ -164,32 +210,37 @@ class _PremiumNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.only(top: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-            blurRadius: 20,
-            offset: const Offset(0, -4),
-          ),
-        ],
+      color: Colors.transparent,
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        bottom: MediaQuery.of(context).padding.bottom + 12,
+        top: 8,
       ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: tabs.asMap().entries.map((e) {
-              final selected = currentIndex == e.key;
-              return _NavItem(
-                item: e.value,
-                selected: selected,
-                onTap: () => onTap(e.key),
-              );
-            }).toList(),
-          ),
+      child: Container(
+        height: 66,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.94),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F172A).withValues(alpha: 0.06),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: tabs.asMap().entries.map((e) {
+            final selected = currentIndex == e.key;
+            return _NavItem(
+              item: e.value,
+              selected: selected,
+              onTap: () => onTap(e.key),
+            );
+          }).toList(),
         ),
       ),
     );
@@ -212,26 +263,20 @@ class _NavItem extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 56,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              selected ? item.activeIcon : item.icon,
-              size: 24,
-              color: selected ? CiroColors.brandAccent : CiroColors.textMuted,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              item.label,
-              style: CiroTypography.labelSmall.copyWith(
-                color: selected ? CiroColors.brandAccent : CiroColors.textMuted,
-                fontSize: 10,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-              ),
-            ),
-          ],
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected
+              ? const Color(0xFF4F46E5).withValues(alpha: 0.08)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Icon(
+          selected ? item.activeIcon : item.icon,
+          size: 30, // Larger, more professional icons as requested
+          color: selected ? const Color(0xFF4F46E5) : const Color(0xFF94A3B8),
         ),
       ),
     );

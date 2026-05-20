@@ -130,28 +130,39 @@ class RealScenarioAdapter {
     final delay = traffic?.delayRatio ?? 1.0;
     final congestion = traffic?.congestionLevel ?? CongestionLevel.unknown;
 
-    final flood = weather?.alertLevel == WeatherRisk.floodRisk ||
-        weather?.alertLevel == WeatherRisk.heavyRain ||
-        rainfall > 8 ||
-        text.contains('flood') ||
-        text.contains('rain') ||
-        text.contains('waterlog');
-    final heat = weather?.alertLevel == WeatherRisk.heatwave ||
-        temp >= 38 ||
-        feels >= 41 ||
-        text.contains('heatwave') ||
-        text.contains('heat stroke');
-    final accident = text.contains('accident') ||
-        text.contains('collision') ||
-        text.contains('crash');
-    final outage = text.contains('power outage') ||
-        text.contains('blackout') ||
-        text.contains('electricity');
-    final blocked = congestion == CongestionLevel.high ||
-        delay >= 1.45 ||
-        text.contains('traffic jam') ||
-        text.contains('road blocked') ||
-        text.contains('blockage');
+    final userArea = bundle.location.area.toLowerCase();
+    final isInjected = bundle.warnings.any((w) => w.contains('Simulated threat'));
+
+    // Helper to check if a news article specifically names the user's immediate area
+    bool isLocallySpecific(String newsText) {
+      if (isInjected) return true;
+      if (userArea.isEmpty) return false;
+      final normalizedArea = userArea.replaceAll('-', '').trim();
+      final normalizedNews = newsText.replaceAll('-', '').toLowerCase();
+      return normalizedNews.contains(normalizedArea);
+    }
+
+    // 1. FLOOD: Trigger only if heavy rainfall measured, active flood alert, or a local news report confirms it in the exact area
+    final hasActiveFloodWeather = weather?.alertLevel == WeatherRisk.floodRisk ||
+        rainfall > 12.0;
+    final hasLocalFloodNews = (text.contains('flood') || text.contains('waterlog')) && isLocallySpecific(text);
+    final flood = hasActiveFloodWeather || hasLocalFloodNews;
+
+    // 2. HEATWAVE: Trigger only if temp is extreme or local heat news specifically targets their area
+    final hasActiveHeatWeather = weather?.alertLevel == WeatherRisk.heatwave || temp >= 39.0 || feels >= 42.0;
+    final hasLocalHeatNews = text.contains('heatwave') && isLocallySpecific(text);
+    final heat = hasActiveHeatWeather || hasLocalHeatNews;
+
+    // 3. ACCIDENT: Trigger only if a news report confirms a collision in their exact area
+    final accident = (text.contains('accident') || text.contains('collision') || text.contains('crash')) && isLocallySpecific(text);
+
+    // 4. POWER OUTAGE: Trigger only if outage news specifically names their area
+    final outage = (text.contains('power outage') || text.contains('blackout') || text.contains('load shedding')) && isLocallySpecific(text);
+
+    // 5. ROAD BLOCKAGE: Trigger only if Google Routes shows severe congestion OR local blockage news names their area
+    final hasSevereTraffic = congestion == CongestionLevel.high && delay >= 1.5;
+    final hasLocalBlockNews = text.contains('road blocked') && isLocallySpecific(text);
+    final blocked = hasSevereTraffic || hasLocalBlockNews;
 
     if (flood) {
       return _Classification(
@@ -189,7 +200,7 @@ class RealScenarioAdapter {
       );
     }
 
-    return _Classification(CrisisType.roadBlockage, SeverityLevel.low, bundle.hasRealData ? 68 : 45);
+    return _Classification(CrisisType.roadBlockage, SeverityLevel.low, bundle.hasRealData ? 90.0 : 95.0);
   }
 
   static double _confidence(

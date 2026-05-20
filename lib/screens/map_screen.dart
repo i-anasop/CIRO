@@ -19,10 +19,10 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   String _layer = 'All Layers';
-  int _zoom = 15;
-  bool _showRisk = false;
-  bool _showRoute = false;
-  int _recenterSignal = 0;
+  final int _zoom = 15;
+  final bool _showRisk = false;
+  final bool _showRoute = false;
+  final int _recenterSignal = 0;
 
   static const _layers = [
     'All Layers',
@@ -70,35 +70,43 @@ class _MapScreenState extends State<MapScreen> {
                           Expanded(
                             child: Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 10,
+                                horizontal: 20,
+                                vertical: 12,
                               ),
-                              decoration: _glassDecoration(),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                              decoration: _premiumSearchBarDecoration(),
+                              child: Row(
                                 children: [
-                                  Text(
-                                    isDemo
-                                        ? 'Google Map - G-10, Islamabad'
-                                        : 'Google Live Situation Map',
-                                    style: CiroTypography.labelLarge,
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    crisis.location,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: CiroTypography.bodySmall,
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          isDemo
+                                              ? 'Google Map - G-10, Islamabad'
+                                              : 'Google Live Situation Map',
+                                          style: CiroTypography.labelLarge.copyWith(
+                                            fontSize: 13.5,
+                                            fontWeight: FontWeight.w900,
+                                            color: const Color(0xFF1E293B),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          crisis.location,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: CiroTypography.bodySmall.copyWith(
+                                            fontSize: 11,
+                                            color: const Color(0xFF94A3B8),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          _RoundButton(
-                            icon: Icons.tune_rounded,
-                            onTap: _showLayerSheet,
-                            tooltip: 'Map controls',
                           ),
                         ],
                       ),
@@ -116,71 +124,6 @@ class _MapScreenState extends State<MapScreen> {
                                 ),
                               )
                               .toList(),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            _TogglePill(
-                              label: 'Boundary',
-                              icon: Icons.crop_free_rounded,
-                              active: true,
-                              activeColor: CiroColors.brand,
-                              onTap: () {},
-                            ),
-                            const SizedBox(width: 8),
-                            _TogglePill(
-                              label: 'Risk Zone',
-                              icon: Icons.radar_rounded,
-                              active: _showRisk,
-                              activeColor: CiroColors.critical,
-                              onTap: () =>
-                                  setState(() => _showRisk = !_showRisk),
-                            ),
-                            const SizedBox(width: 8),
-                            _TogglePill(
-                              label: 'Route',
-                              icon: Icons.alt_route_rounded,
-                              active: _showRoute,
-                              activeColor: CiroColors.success,
-                              onTap: () =>
-                                  setState(() => _showRoute = !_showRoute),
-                            ),
-                            const SizedBox(width: 12),
-                            _MiniMapButton(
-                              icon: Icons.remove_rounded,
-                              onTap: () => setState(
-                                () => _zoom = (_zoom - 1).clamp(10, 20),
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                              ),
-                              child: Text(
-                                'z$_zoom',
-                                style: CiroTypography.labelSmall,
-                              ),
-                            ),
-                            _MiniMapButton(
-                              icon: Icons.add_rounded,
-                              onTap: () => setState(
-                                () => _zoom = (_zoom + 1).clamp(10, 20),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            _MiniMapButton(
-                              icon: Icons.my_location_rounded,
-                              color: CiroColors.brand,
-                              onTap: () => setState(() {
-                                _zoom = 15;
-                                _layer = 'All Layers';
-                                _recenterSignal++;
-                              }),
-                            ),
-                          ],
                         ),
                       ),
                     ],
@@ -215,114 +158,7 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  void _showLayerSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheet) {
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: CiroColors.border,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text('Map Controls', style: CiroTypography.headingSmall),
-                const SizedBox(height: 4),
-                Text(
-                  AppModeService.instance.isDemoMode
-                      ? 'Google Maps shows the searched G-10 boundary. Filters change the map search context.'
-                      : 'Live situation map with real-time overlays. Filters change the map search context.',
-                  style: CiroTypography.bodySmall,
-                ),
-                const SizedBox(height: 16),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  secondary: const Icon(
-                    Icons.radar_rounded,
-                    color: CiroColors.critical,
-                  ),
-                  title: const Text('Risk Perimeter'),
-                  subtitle: const Text(
-                    'Show CIRO flood risk overlay on supported map views.',
-                  ),
-                  value: _showRisk,
-                  activeThumbColor: CiroColors.critical,
-                  onChanged: (v) {
-                    setState(() => _showRisk = v);
-                    setSheet(() {});
-                  },
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  secondary: const Icon(
-                    Icons.alt_route_rounded,
-                    color: CiroColors.success,
-                  ),
-                  title: const Text('Alternate Route'),
-                  subtitle: const Text(
-                    'Show CIRO recommended response route on supported map views.',
-                  ),
-                  value: _showRoute,
-                  activeThumbColor: CiroColors.success,
-                  onChanged: (v) {
-                    setState(() => _showRoute = v);
-                    setSheet(() {});
-                  },
-                ),
-                const SizedBox(height: 10),
-                Text('Active Layer', style: CiroTypography.labelLarge),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _layers.map((l) {
-                    final selected = _layer == l;
-                    return ChoiceChip(
-                      avatar: Icon(
-                        _layerIcons[l],
-                        size: 16,
-                        color: selected
-                            ? Colors.white
-                            : CiroColors.textSecondary,
-                      ),
-                      label: Text(l),
-                      selected: selected,
-                      selectedColor: CiroColors.brand,
-                      labelStyle: TextStyle(
-                        color: selected ? Colors.white : CiroColors.textPrimary,
-                        fontWeight: selected
-                            ? FontWeight.w600
-                            : FontWeight.normal,
-                      ),
-                      onSelected: (_) {
-                        setState(() => _layer = l);
-                        setSheet(() {});
-                      },
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
+
 }
 
 class _MapSummaryPanel extends StatelessWidget {
@@ -332,9 +168,22 @@ class _MapSummaryPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actions = ScenarioEngine.instance.responsePlan.take(2).toList();
+    final isDemo = AppModeService.instance.isDemoMode;
+
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: _glassDecoration(),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: const Color(0xFFF1F5F9), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -342,16 +191,16 @@ class _MapSummaryPanel extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
-                  color: CiroColors.bySeverityBg(crisis.severityLabel),
-                  borderRadius: BorderRadius.circular(12),
+                  color: const Color(0xFFFEF2F2), // Soft pink/red
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
-                  _crisisIcon(crisis.type),
-                  color: CiroColors.bySeverity(crisis.severityLabel),
-                  size: 20,
+                  isDemo ? Icons.water_drop_outlined : _crisisIcon(crisis.type),
+                  color: const Color(0xFFEF4444),
+                  size: 22,
                 ),
               ),
               const SizedBox(width: 12),
@@ -360,74 +209,97 @@ class _MapSummaryPanel extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      crisis.title,
+                      isDemo ? 'Urban Flooding — G-10, Islamabad' : crisis.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: CiroTypography.labelLarge,
+                      style: CiroTypography.labelLarge.copyWith(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF1E293B),
+                      ),
                     ),
+                    const SizedBox(height: 3),
                     Text(
-                      '${crisis.typeLabel} - ${crisis.confidence}% confidence',
-                      style: CiroTypography.bodySmall,
+                      isDemo
+                          ? 'Urban Flooding - 91% confidence'
+                          : '${crisis.typeLabel} - ${crisis.confidence}% confidence',
+                      style: CiroTypography.bodySmall.copyWith(
+                        fontSize: 12,
+                        color: const Color(0xFF94A3B8),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
-                  vertical: 4,
+                  vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: CiroColors.bySeverityBg(crisis.severityLabel),
+                  color: const Color(0xFFFEE2E2), // very soft pink
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(
-                  crisis.severityLabel.toUpperCase(),
-                  style: CiroTypography.labelSmall.copyWith(
-                    color: CiroColors.bySeverity(crisis.severityLabel),
-                    fontWeight: FontWeight.w700,
+                child: const Text(
+                  'CRITICAL',
+                  style: TextStyle(
+                    color: Color(0xFFEF4444),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
                   ),
                 ),
               ),
             ],
           ),
           if (actions.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            const Divider(height: 1),
-            const SizedBox(height: 10),
+            const Divider(
+              color: Color(0xFFF1F5F9),
+              thickness: 1.0,
+              height: 28,
+            ),
             ...actions.map(
               (a) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.only(bottom: 10.0),
                 child: Row(
                   children: [
                     Container(
-                      width: 24,
-                      height: 24,
-                      alignment: Alignment.center,
+                      width: 26,
+                      height: 26,
                       decoration: BoxDecoration(
-                        color: CiroColors.brandGlow,
-                        borderRadius: BorderRadius.circular(6),
+                        color: const Color(0xFFEEF2FF), // Very soft lavender/blue
+                        borderRadius: BorderRadius.circular(8),
                       ),
+                      alignment: Alignment.center,
                       child: Text(
                         '${a.step}',
-                        style: CiroTypography.labelSmall.copyWith(
-                          color: CiroColors.brandAccent,
+                        style: const TextStyle(
+                          color: Color(0xFF6366F1), // Darker lavender/blue
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         a.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: CiroTypography.bodySmall,
+                        style: const TextStyle(
+                          color: Color(0xFF64748B), // Muted gray/slate
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Text(
                       a.eta,
-                      style: CiroTypography.labelSmall.copyWith(
-                        color: CiroColors.textMuted,
+                      style: const TextStyle(
+                        color: Color(0xFF64748B), // Muted gray/slate
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
@@ -462,14 +334,23 @@ class _LayerChip extends StatelessWidget {
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
-            color: selected ? CiroColors.brand : Colors.white,
-            borderRadius: BorderRadius.circular(24),
+            color: selected ? const Color(0xFF4E54E1) : Colors.white,
+            borderRadius: BorderRadius.circular(30),
             border: Border.all(
-              color: selected ? CiroColors.brand : CiroColors.border,
+              color: selected ? Colors.transparent : const Color(0xFFE2E8F0),
+              width: 1,
             ),
-            boxShadow: CiroColors.cardShadow,
+            boxShadow: [
+              BoxShadow(
+                color: selected
+                    ? const Color(0xFF4E54E1).withValues(alpha: 0.25)
+                    : const Color(0xFF0F172A).withValues(alpha: 0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -477,14 +358,14 @@ class _LayerChip extends StatelessWidget {
               Icon(
                 icon,
                 size: 15,
-                color: selected ? Colors.white : CiroColors.textSecondary,
+                color: selected ? Colors.white : const Color(0xFF64748B),
               ),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: CiroTypography.labelSmall.copyWith(
-                  color: selected ? Colors.white : CiroColors.textPrimary,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? Colors.white : const Color(0xFF1E293B),
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
                 ),
               ),
             ],
@@ -504,15 +385,28 @@ class _RoundButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final child = Material(
-      color: Colors.white,
-      shape: const CircleBorder(),
-      elevation: 3,
-      child: IconButton(
-        onPressed: onTap,
-        icon: Icon(icon),
-        color: CiroColors.textPrimary,
-        iconSize: 22,
+    final child = GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 0.8),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Icon(
+          icon,
+          color: const Color(0xFF1E293B),
+          size: 20,
+        ),
       ),
     );
     if (tooltip != null) return Tooltip(message: tooltip!, child: child);
@@ -520,88 +414,17 @@ class _RoundButton extends StatelessWidget {
   }
 }
 
-class _MiniMapButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  final Color? color;
-
-  const _MiniMapButton({required this.icon, required this.onTap, this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      shape: const CircleBorder(),
-      elevation: 2,
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: SizedBox(
-          width: 34,
-          height: 34,
-          child: Icon(icon, size: 18, color: color ?? CiroColors.textPrimary),
-        ),
-      ),
-    );
-  }
-}
-
-class _TogglePill extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool active;
-  final Color activeColor;
-  final VoidCallback onTap;
-
-  const _TogglePill({
-    required this.label,
-    required this.icon,
-    required this.active,
-    required this.activeColor,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: active ? activeColor.withValues(alpha: 0.12) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: active ? activeColor : CiroColors.border),
-          boxShadow: CiroColors.cardShadow,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 14,
-              color: active ? activeColor : CiroColors.textMuted,
-            ),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: CiroTypography.labelSmall.copyWith(
-                color: active ? activeColor : CiroColors.textSecondary,
-                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-BoxDecoration _glassDecoration() => BoxDecoration(
-  color: Colors.white.withValues(alpha: 0.94),
-  borderRadius: BorderRadius.circular(18),
-  border: Border.all(color: CiroColors.border),
-  boxShadow: CiroColors.cardShadow,
+BoxDecoration _premiumSearchBarDecoration() => BoxDecoration(
+  color: Colors.white,
+  borderRadius: BorderRadius.circular(32),
+  border: Border.all(color: const Color(0xFFE2E8F0), width: 0.8),
+  boxShadow: [
+    BoxShadow(
+      color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+      blurRadius: 16,
+      offset: const Offset(0, 4),
+    ),
+  ],
 );
 
 (double, double) _coords(Crisis crisis) {

@@ -12,8 +12,11 @@ import 'location_service.dart';
 import 'geocoding_service.dart';
 import 'weather_service.dart';
 import 'news_signal_service.dart';
+import 'gnews_signal_service.dart';
 import 'routes_service.dart';
 import 'app_config.dart';
+import '../models/crisis.dart';
+import 'scenario_engine.dart';
 
 /// The combined output from all real data services.
 class RealSignalBundle {
@@ -103,15 +106,27 @@ class RealSignalService {
     final lon  = location.longitude ?? 73.0179;
     final city = location.city.isNotEmpty ? location.city : 'Islamabad';
 
-    // 3. Weather (parallel with news + routes)
+    // 3. Weather, news, and routes fetched in parallel
     final weatherFuture = AppConfig.instance.hasOpenWeatherKey
         ? WeatherService.instance.getWeather(lat, lon)
         : Future.value(WeatherResult.failure('No OpenWeather key configured'));
 
-    final newsFuture = AppConfig.instance.hasNewsApiKey
-        ? NewsSignalService.instance.fetchSignals(
-            location.area.isNotEmpty ? '${location.area} $city' : city)
-        : Future.value(<NewsSignal>[]);
+    // News: Try NewsAPI first, then GNews + ReliefWeb (always try both in parallel)
+    final locationQuery = location.area.isNotEmpty ? '${location.area} $city' : city;
+    final newsFuture = Future.wait([
+      AppConfig.instance.hasNewsApiKey
+          ? NewsSignalService.instance.fetchSignals(locationQuery)
+          : Future.value(<NewsSignal>[]),
+      GnewsSignalService.instance.fetchSignals(locationQuery),
+    ]).then((results) {
+      final combined = <NewsSignal>[...results[0], ...results[1]];
+      // Deduplicate by title similarity
+      final seen = <String>{};
+      return combined.where((s) {
+        final key = s.title.substring(0, s.title.length.clamp(0, 40));
+        return seen.add(key);
+      }).take(5).toList();
+    });
 
     final routesFuture = AppConfig.instance.hasGoogleMapsKey
         ? RoutesService.instance.getTrafficConditions(lat, lon)
@@ -139,12 +154,191 @@ class RealSignalService {
       warnings.add('Location: fallback coordinates used');
     }
 
+    WeatherResult finalWeather = weather;
+    List<NewsSignal> finalNews = List<NewsSignal>.from(news);
+    RouteResult finalTraffic = traffic;
+
+    final injectedType = ScenarioEngine.instance.injectedRealCrisisType;
+    if (injectedType != null) {
+      warnings.add('Real Mode: Simulated threat signals injected for testing.');
+      // Clear key/service warnings to prevent dashboard clutter
+      warnings.removeWhere((w) => w.contains('Weather:') || w.contains('Traffic:') || w.contains('News/Public Feed:'));
+      
+      switch (injectedType) {
+        case CrisisType.urbanFlooding:
+          finalWeather = WeatherResult(
+            temperature: 24.2,
+            feelsLike: 25.0,
+            condition: 'Heavy Rain',
+            description: 'Torrential downpour and active monsoon storm',
+            humidity: 95,
+            windSpeed: 18.5,
+            rainfallLastHour: 22.5,
+            alertLevel: WeatherRisk.floodRisk,
+            isSuccess: true,
+            rawSummary: 'Rain: 22.5mm/hr | Active Flood Warning',
+          );
+          finalNews = [
+            NewsSignal(
+              title: 'Flash flooding and waterlogging reported on major roads near $city.',
+              description: 'Continuous torrential rains have inundated low-lying areas in $city. Civil authorities advise caution.',
+              source: 'Met Office Alert',
+              matchedKeyword: 'flood',
+              publishedAt: DateTime.now(),
+              url: 'https://ciro.alert.gov',
+              confidenceHint: 0.95,
+            ),
+          ];
+          finalTraffic = const RouteResult(
+            normalDurationMinutes: 12,
+            trafficDurationMinutes: 28,
+            distanceKm: 5.4,
+            congestionLevel: CongestionLevel.high,
+            routeSummary: 'Islamabad Highway',
+            isSuccess: true,
+          );
+          break;
+        case CrisisType.heatwave:
+          finalWeather = WeatherResult(
+            temperature: 43.5,
+            feelsLike: 47.0,
+            condition: 'Extreme Heat',
+            description: 'Severe heatwave conditions with high UV index',
+            humidity: 15,
+            windSpeed: 8.0,
+            rainfallLastHour: 0,
+            alertLevel: WeatherRisk.heatwave,
+            isSuccess: true,
+            rawSummary: 'Temp: 43.5°C | Feels like: 47.0°C | Heatwave Warning',
+          );
+          finalNews = [
+            NewsSignal(
+              title: 'Government issues red alert for extreme heatwave in $city region.',
+              description: 'Temperatures projected to touch 44°C. cooling centers activated. Citizens advised to remain indoors.',
+              source: 'Public Health Department',
+              matchedKeyword: 'heatwave',
+              publishedAt: DateTime.now(),
+              url: 'https://ciro.alert.gov',
+              confidenceHint: 0.95,
+            ),
+          ];
+          finalTraffic = const RouteResult(
+            normalDurationMinutes: 10,
+            trafficDurationMinutes: 11,
+            distanceKm: 4.8,
+            congestionLevel: CongestionLevel.low,
+            routeSummary: 'Arterial Road 1',
+            isSuccess: true,
+          );
+          break;
+        case CrisisType.accident:
+          finalWeather = WeatherResult(
+            temperature: 28.0,
+            feelsLike: 29.5,
+            condition: 'Clear',
+            description: 'Clear conditions',
+            humidity: 50,
+            windSpeed: 6.2,
+            rainfallLastHour: 0,
+            alertLevel: WeatherRisk.none,
+            isSuccess: true,
+            rawSummary: 'Temp: 28°C | Clear Sky',
+          );
+          finalNews = [
+            NewsSignal(
+              title: 'Major multi-vehicle accident reported near geocoded sector in $city.',
+              description: 'Emergency services responding to a crash. Lane closures causing severe delays.',
+              source: 'Police Dispatch',
+              matchedKeyword: 'accident',
+              publishedAt: DateTime.now(),
+              url: 'https://ciro.alert.gov',
+              confidenceHint: 0.90,
+            ),
+          ];
+          finalTraffic = const RouteResult(
+            normalDurationMinutes: 15,
+            trafficDurationMinutes: 32,
+            distanceKm: 6.2,
+            congestionLevel: CongestionLevel.high,
+            routeSummary: 'Sector Arterial Road',
+            isSuccess: true,
+          );
+          break;
+        case CrisisType.powerOutage:
+          finalWeather = WeatherResult(
+            temperature: 32.0,
+            feelsLike: 35.0,
+            condition: 'Haze',
+            description: 'Warm, hazy conditions',
+            humidity: 60,
+            windSpeed: 4.5,
+            rainfallLastHour: 0,
+            alertLevel: WeatherRisk.none,
+            isSuccess: true,
+            rawSummary: 'Temp: 32°C | Hazy',
+          );
+          finalNews = [
+            NewsSignal(
+              title: 'Power grid substation failure causes major outage in $city.',
+              description: 'Electricity offline in multiple sectors. Utility crews estimate 3 hours for complete restoration.',
+              source: 'Grid Operations',
+              matchedKeyword: 'outage',
+              publishedAt: DateTime.now(),
+              url: 'https://ciro.alert.gov',
+              confidenceHint: 0.85,
+            ),
+          ];
+          finalTraffic = const RouteResult(
+            normalDurationMinutes: 10,
+            trafficDurationMinutes: 13,
+            distanceKm: 4.1,
+            congestionLevel: CongestionLevel.medium,
+            routeSummary: 'Grid Center Road',
+            isSuccess: true,
+          );
+          break;
+        case CrisisType.roadBlockage:
+          finalWeather = WeatherResult(
+            temperature: 26.5,
+            feelsLike: 27.0,
+            condition: 'Overcast',
+            description: 'Cloudy conditions',
+            humidity: 75,
+            windSpeed: 10.0,
+            rainfallLastHour: 0,
+            alertLevel: WeatherRisk.none,
+            isSuccess: true,
+            rawSummary: 'Temp: 26.5°C | Overcast',
+          );
+          finalNews = [
+            NewsSignal(
+              title: 'Significant road blockage reported on main arterial corridor in $city.',
+              description: 'All lanes blocked due to structural hazard/debris. Commuters urged to take alternative routes.',
+              source: 'Municipal Transit',
+              matchedKeyword: 'blockage',
+              publishedAt: DateTime.now(),
+              url: 'https://ciro.alert.gov',
+              confidenceHint: 0.90,
+            ),
+          ];
+          finalTraffic = const RouteResult(
+            normalDurationMinutes: 12,
+            trafficDurationMinutes: 35,
+            distanceKm: 5.0,
+            congestionLevel: CongestionLevel.high,
+            routeSummary: 'Main Expressway Link',
+            isSuccess: true,
+          );
+          break;
+      }
+    }
+
     return RealSignalBundle(
       location:    location,
-      weather:     weather.isSuccess  ? weather  : null,
-      newsSignals: news,
-      traffic:     traffic.isSuccess  ? traffic  : null,
-      succeeded:   weather.isSuccess || news.isNotEmpty || traffic.isSuccess,
+      weather:     finalWeather.isSuccess ? finalWeather : null,
+      newsSignals: finalNews,
+      traffic:     finalTraffic.isSuccess ? finalTraffic : null,
+      succeeded:   finalWeather.isSuccess || finalNews.isNotEmpty || finalTraffic.isSuccess,
       warnings:    warnings,
     );
   }

@@ -19,6 +19,7 @@ import '../models/route_result.dart';
 import '../models/orchestration_models.dart';
 import '../agents/agent_pipeline.dart';
 import '../agents/gemini_agent_pipeline.dart';
+import '../services/groq_service.dart';
 import '../services/gemini_service.dart';
 import '../services/real_signal_service.dart';
 import '../services/notification_service.dart';
@@ -38,10 +39,32 @@ class ScenarioEngine extends ChangeNotifier {
   bool _isGeminiActive = false;
   bool _isUsingFallback = false;
   final List<String> _internalDebugLogs = [];
+  CrisisType? _injectedRealCrisisType;
 
   bool get isGeminiActive => _isGeminiActive;
   bool get isUsingFallback => _isUsingFallback;
   List<String> get internalDebugLogs => _internalDebugLogs;
+  CrisisType? get injectedRealCrisisType => _injectedRealCrisisType;
+
+  void setInjectedRealCrisisType(CrisisType? type) {
+    if (_injectedRealCrisisType == type) return;
+    _injectedRealCrisisType = type;
+    notifyListeners();
+    // Re-run real signal analysis if in Real Mode (SCN-REAL)
+    if (_activeScenarioId == 'SCN-REAL') {
+      final loc = _currentResult.scenario.coordinates;
+      double? lat;
+      double? lng;
+      try {
+        final parts = loc.split(',');
+        if (parts.length == 2) {
+          lat = double.parse(parts[0].trim());
+          lng = double.parse(parts[1].trim());
+        }
+      } catch (_) {}
+      runRealSignalAnalysis(latitude: lat, longitude: lng);
+    }
+  }
 
   // ── Init ──────────────────────────────────────────────────────────────────
   void initialize() {
@@ -220,11 +243,13 @@ class ScenarioEngine extends ChangeNotifier {
 
     try {
       _internalDebugLogs.clear();
+      GroqService.instance.resetLastCallStatus();
       GeminiService.instance.resetLastCallStatus();
 
-      // Check key configuration
-      final hasKey = AppConfig.instance.hasGeminiKey;
-      _internalDebugLogs.add("Gemini key configured: ${hasKey ? 'yes' : 'no'}");
+      // Check key configuration — Groq first, then Gemini
+      final hasGroq   = AppConfig.instance.hasGroqKey;
+      final hasGemini = AppConfig.instance.hasGeminiKey;
+      _internalDebugLogs.add('Groq key: ${hasGroq ? "yes" : "no"} | Gemini key: ${hasGemini ? "yes" : "no"}');
 
       double? lat = latitude;
       double? lng = longitude;
@@ -243,42 +268,61 @@ class ScenarioEngine extends ChangeNotifier {
 
       _activeScenarioId = 'SCN-REAL';
 
-      // Try a lightweight Gemini test call first to verify key health
-      bool geminiWorks = false;
-      if (GeminiService.instance.isAvailable) {
-        _internalDebugLogs.add("Gemini test initiated...");
-        final testResult = await GeminiService.instance.generateText('Ping');
-        if (testResult != null && GeminiService.instance.lastCallSucceeded) {
-          geminiWorks = true;
-          _isGeminiActive = true;
+      // 2. Health-check: Groq first, then Gemini, then local fallback
+      bool aiWorks = false;
+
+      if (hasGroq) {
+        _internalDebugLogs.add('Testing Groq connection...');
+        final testResult = await GroqService.instance.generateText('Ping');
+        if (testResult != null && GroqService.instance.lastCallSucceeded) {
+          aiWorks = true;
+          _isGeminiActive = true;   // reusing flag — means "AI is active"
           _isUsingFallback = false;
-          _internalDebugLogs.add("Gemini test passed");
+          _internalDebugLogs.add('Groq test passed ✓ — Llama 3.3 pipeline active');
         } else {
-          geminiWorks = false;
-          _isGeminiActive = false;
-          _isUsingFallback = true;
-          _internalDebugLogs.add("Gemini failed - fallback activated");
+          _internalDebugLogs.add('Groq test failed — trying Gemini...');
         }
-      } else {
-        _isGeminiActive = false;
-        _isUsingFallback = true;
-        _internalDebugLogs.add("Gemini key unavailable - fallback activated");
       }
 
-      // 2. Route to Gemini AI pipeline if available & working, else Local Agentic Fallback
-      if (geminiWorks) {
-        debugPrint('[ScenarioEngine] Running Gemini AI pipeline...');
-        _currentResult = await GeminiAgentPipeline.run(bundle);
-        debugPrint('[ScenarioEngine] Gemini AI pipeline complete.');
-        
-        // Double check in case any sub-agent call set lastCallSucceeded to false
-        if (!GeminiService.instance.lastCallSucceeded) {
+      if (!aiWorks && hasGemini) {
+        _internalDebugLogs.add('Testing Gemini connection...');
+        final testResult = await GeminiService.instance.generateText('Ping');
+        if (testResult != null && GeminiService.instance.lastCallSucceeded) {
+          aiWorks = true;
+          _isGeminiActive = true;
+          _isUsingFallback = false;
+          _internalDebugLogs.add('Gemini test passed ✓ — Gemini 2.0 Flash pipeline active');
+        } else {
           _isGeminiActive = false;
           _isUsingFallback = true;
-          _internalDebugLogs.add("Gemini sub-agent failed during run - fallback active next cycle");
+          _internalDebugLogs.add('Gemini test failed — local fallback activated');
+        }
+      }
+
+      if (!aiWorks && !hasGroq && !hasGemini) {
+        _isGeminiActive = false;
+        _isUsingFallback = true;
+        _internalDebugLogs.add('No AI keys configured — local fallback activated');
+      }
+
+      // 3. Route to AI pipeline if working, else Local Agentic Fallback
+      if (aiWorks) {
+        final engineLabel = hasGroq ? 'Groq' : 'Gemini';
+        debugPrint('[ScenarioEngine] Running $engineLabel AI pipeline...');
+        _currentResult = await GeminiAgentPipeline.run(bundle);
+        debugPrint('[ScenarioEngine] $engineLabel AI pipeline complete.');
+
+        // Double-check in case any sub-agent failed during run
+        final stillWorking = hasGroq
+            ? GroqService.instance.lastCallSucceeded
+            : GeminiService.instance.lastCallSucceeded;
+        if (!stillWorking) {
+          _isGeminiActive = false;
+          _isUsingFallback = true;
+          _internalDebugLogs.add('AI sub-agent failed during run — fallback active next cycle');
         }
       } else {
-        debugPrint('[ScenarioEngine] Gemini unavailable — using Local Agentic Fallback Mode (deterministic pipeline).');
+        debugPrint('[ScenarioEngine] AI unavailable — using Local Agentic Fallback Mode.');
         final scenario = _toDemoScenario(bundle);
         _currentResult = _runPipeline(scenario);
       }
@@ -286,7 +330,7 @@ class ScenarioEngine extends ChangeNotifier {
       _isRunning = false;
       notifyListeners();
 
-      // 3. Trigger notifications based on crisis severity and conditions
+      // 4. Trigger notifications based on crisis severity and conditions
       _triggerNotificationsForRealMode(bundle);
     } catch (e) {
       debugPrint('[ScenarioEngine] Real analysis error: $e');

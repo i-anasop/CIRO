@@ -61,21 +61,29 @@ class _SplashScreenState extends State<SplashScreen>
     try {
       final isRealMode = AppModeService.instance.isRealMode;
       if (isRealMode) {
-        // Silently request current location and geocode it
-        final locResult = await LocationService.instance.getCurrentLocation();
-        final geocoded = await GeocodingService.instance.reverseGeocode(locResult);
-        
-        ScenarioEngine.instance.overrideLocation(
-          geocoded.displayLabel,
-          lat: geocoded.latitude,
-          lng: geocoded.longitude,
-        );
-
-        // Run live real mode crisis analysis silently in the background
-        await ScenarioEngine.instance.runRealSignalAnalysis(
-          latitude: geocoded.latitude,
-          longitude: geocoded.longitude,
-        );
+        // Silently request current location and geocode it asynchronously
+        // to avoid blocking the main UI thread during splash animations.
+        LocationService.instance.getCurrentLocation().then((locResult) {
+          GeocodingService.instance.reverseGeocode(locResult).then((geocoded) {
+            ScenarioEngine.instance.overrideLocation(
+              geocoded.displayLabel,
+              lat: geocoded.latitude,
+              lng: geocoded.longitude,
+            );
+            
+            // Silently run the real mode analysis in the background
+            ScenarioEngine.instance.runRealSignalAnalysis(
+              latitude: geocoded.latitude,
+              longitude: geocoded.longitude,
+            ).catchError((err) {
+              debugPrint("Background real signal analysis failed: $err");
+            });
+          }).catchError((err) {
+            debugPrint("Background geocoding failed: $err");
+          });
+        }).catchError((err) {
+          debugPrint("Background location fetch failed: $err");
+        });
       }
     } catch (e) {
       debugPrint("Error initializing during splash: $e");

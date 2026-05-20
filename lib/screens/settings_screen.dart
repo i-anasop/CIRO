@@ -13,6 +13,7 @@ import '../services/notification_service.dart';
 import '../services/location_service.dart';
 import '../services/geocoding_service.dart';
 import '../components/settings_sheets.dart';
+import '../models/crisis.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -731,6 +732,136 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 );
               },
             ),
+            ListenableBuilder(
+              listenable: AppModeService.instance,
+              builder: (context, _) {
+                final service = AppModeService.instance;
+                final isRealMode = service.isRealMode;
+                if (!isRealMode) return const SizedBox.shrink();
+                return ListenableBuilder(
+                  listenable: ScenarioEngine.instance,
+                  builder: (context, _) {
+                    final selectedType = ScenarioEngine.instance.injectedRealCrisisType;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 28),
+                        Row(
+                          children: [
+                            const Text(
+                              'Real-Mode Threat Simulator',
+                              style: TextStyle(
+                                color: titleColor,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEFF6FF),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: const Color(0xFFBFDBFE)),
+                              ),
+                              child: const Text(
+                                'GPS INJECTOR',
+                                style: TextStyle(
+                                  color: Color(0xFF1D4ED8),
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Inject active threat signals at your real GPS coordinates to test 9-agent pipeline orchestration.',
+                          style: TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.03),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              _buildInjectorOption(
+                                type: null,
+                                title: 'Clear / Live Monitoring Only',
+                                subtitle: 'Use actual weather/traffic/news from GPS without simulation.',
+                                icon: Icons.radar_rounded,
+                                color: const Color(0xFF10B981),
+                                isSelected: selectedType == null,
+                              ),
+                              _buildDivider(),
+                              _buildInjectorOption(
+                                type: CrisisType.urbanFlooding,
+                                title: 'Torrents & Monsoon Runoff',
+                                subtitle: 'Simulate extreme rainfall, waterlogging, and flood warning.',
+                                icon: Icons.thunderstorm_rounded,
+                                color: const Color(0xFF3B82F6),
+                                isSelected: selectedType == CrisisType.urbanFlooding,
+                              ),
+                              _buildDivider(),
+                              _buildInjectorOption(
+                                type: CrisisType.heatwave,
+                                title: 'Severe Summer Heatwave',
+                                subtitle: 'Simulate 43.5°C temperature and health-risk advisory.',
+                                icon: Icons.wb_sunny_rounded,
+                                color: const Color(0xFFF59E0B),
+                                isSelected: selectedType == CrisisType.heatwave,
+                              ),
+                              _buildDivider(),
+                              _buildInjectorOption(
+                                type: CrisisType.accident,
+                                title: 'Multi-Vehicle Road Collision',
+                                subtitle: 'Simulate route delays, crash news reports, and dispatch verification.',
+                                icon: Icons.car_crash_rounded,
+                                color: const Color(0xFFEF4444),
+                                isSelected: selectedType == CrisisType.accident,
+                              ),
+                              _buildDivider(),
+                              _buildInjectorOption(
+                                type: CrisisType.powerOutage,
+                                title: 'Widespread Power Grid Failure',
+                                subtitle: 'Simulate utility blackout reports and backup generator alerts.',
+                                icon: Icons.electrical_services_rounded,
+                                color: const Color(0xFF8B5CF6),
+                                isSelected: selectedType == CrisisType.powerOutage,
+                              ),
+                              _buildDivider(),
+                              _buildInjectorOption(
+                                type: CrisisType.roadBlockage,
+                                title: 'Major Road Obstruction',
+                                subtitle: 'Simulate structural hazards and critical grid traffic congestion.',
+                                icon: Icons.block_rounded,
+                                color: const Color(0xFFEC4899),
+                                isSelected: selectedType == CrisisType.roadBlockage,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
             const SizedBox(height: 28),
 
             // ── 3. Preferences ──────────────────────────────────────────────
@@ -866,12 +997,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         SizedBox(height: 2),
                         Text(
-                          'Version 1.2.0 • Build 120\nSmarter operations. Safer communities.',
+                          'Version 1.2.0 • Build 120\nSmarter operations. Safer communities.\nSupport: ciro.apk@gmail.com',
                           style: TextStyle(
                             color: Color(0xFF64748B),
                             fontSize: 10.5,
                             fontWeight: FontWeight.w500,
-                            height: 1.4,
+                            height: 1.45,
                           ),
                         ),
                       ],
@@ -929,6 +1060,104 @@ class _SettingsScreenState extends State<SettingsScreen> {
       height: 28,
       color: Colors.white.withValues(alpha: 0.20),
     );
+  }
+
+  Widget _buildInjectorOption({
+    required CrisisType? type,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required bool isSelected,
+  }) {
+    return InkWell(
+      onTap: () {
+        ScenarioEngine.instance.setInjectedRealCrisisType(type);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              type == null
+                  ? 'Real Mode: Resetting to actual GPS sensors'
+                  : 'Real Mode: Injected simulated ${_crisisLabel(type)} at GPS location.',
+            ),
+            duration: const Duration(seconds: 2),
+            backgroundColor: const Color(0xFF0F172A),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Icon(icon, color: color, size: 18),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFFCBD5E1),
+                  width: isSelected ? 6 : 2,
+                ),
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _crisisLabel(CrisisType type) {
+    switch (type) {
+      case CrisisType.urbanFlooding:
+        return 'Urban Flooding';
+      case CrisisType.heatwave:
+        return 'Heatwave';
+      case CrisisType.accident:
+        return 'Accident';
+      case CrisisType.powerOutage:
+        return 'Power Outage';
+      case CrisisType.roadBlockage:
+        return 'Road Blockage';
+    }
   }
 }
 

@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../services/app_mode_service.dart';
 import '../services/location_service.dart';
@@ -108,7 +110,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   @override
   void initState() {
     super.initState();
-    _postController.text = _templates[_selectedType]!.prompt;
+    // Start empty so user can Report a crisis with custom text
     _posts = List<_FeedPost>.of(_seedPosts());
     _loadPersistedPosts();
   }
@@ -456,7 +458,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
           children: [
             _FeedHeader(
               onBack: () => context.go('/home'),
-              onMap: () => context.go('/map'),
             ),
             const SizedBox(height: 14),
             _ComposerCard(
@@ -498,11 +499,65 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 }
 
+class _LivePulseDot extends StatefulWidget {
+  const _LivePulseDot();
+
+  @override
+  State<_LivePulseDot> createState() => _LivePulseDotState();
+}
+
+class _LivePulseDotState extends State<_LivePulseDot>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: const Color(0xFF10B981).withValues(
+              alpha: 0.3 + (_controller.value * 0.7),
+            ),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF10B981).withValues(
+                  alpha: _controller.value * 0.5,
+                ),
+                blurRadius: 6,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _FeedHeader extends StatelessWidget {
   final VoidCallback onBack;
-  final VoidCallback onMap;
 
-  const _FeedHeader({required this.onBack, required this.onMap});
+  const _FeedHeader({required this.onBack});
 
   @override
   Widget build(BuildContext context) {
@@ -510,24 +565,30 @@ class _FeedHeader extends StatelessWidget {
       children: [
         _IconButton(icon: Icons.arrow_back_rounded, onTap: onBack),
         const SizedBox(width: 12),
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Crisis Feed',
-                style: TextStyle(
-                  color: CiroColors.textPrimary,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                ),
+              Row(
+                children: [
+                  Text(
+                    'Crisis Feed',
+                    style: GoogleFonts.plusJakartaSans(
+                      color: CiroColors.textPrimary,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const _LivePulseDot(),
+                ],
               ),
-              SizedBox(height: 2),
+              const SizedBox(height: 2),
               Text(
                 'Live local reports from people and responders',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                style: GoogleFonts.plusJakartaSans(
                   color: CiroColors.textSecondary,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -536,7 +597,6 @@ class _FeedHeader extends StatelessWidget {
             ],
           ),
         ),
-        _IconButton(icon: Icons.map_rounded, onTap: onMap),
       ],
     );
   }
@@ -586,12 +646,18 @@ class _ComposerCard extends StatelessWidget {
         ? 'Community crisis report'
         : profile.role.trim();
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: CiroColors.borderLight),
-        boxShadow: CiroColors.cardShadow,
+        border: Border.all(color: const Color(0xFFF1F5F9), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -609,27 +675,31 @@ class _ComposerCard extends StatelessWidget {
                   minLines: 2,
                   maxLines: 4,
                   maxLength: postLimit,
-                  style: const TextStyle(
+                  style: GoogleFonts.plusJakartaSans(
                     color: CiroColors.textPrimary,
                     fontSize: 14,
-                    height: 1.35,
+                    height: 1.45,
                     fontWeight: FontWeight.w700,
                   ),
                   decoration: InputDecoration(
-                    hintText: 'Report a crisis...',
-                    hintStyle: const TextStyle(
-                      color: Color(0xFF9AA4B2),
-                      fontWeight: FontWeight.w700,
+                    hintText: "Report a crisis",
+                    hintStyle: GoogleFonts.plusJakartaSans(
+                      color: const Color(0xFF94A3B8),
+                      fontWeight: FontWeight.w600,
                     ),
                     filled: true,
-                    fillColor: const Color(0xFFF4F6FB),
+                    fillColor: const Color(0xFFF8FAFC),
                     contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
+                      horizontal: 18,
                       vertical: 14,
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(22),
-                      borderSide: BorderSide.none,
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 0.8),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(22),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 0.8),
                     ),
                     counterText: '',
                   ),
@@ -655,7 +725,7 @@ class _ComposerCard extends StatelessWidget {
                 alignment: Alignment.centerRight,
                 child: Text(
                   '$length/$postLimit',
-                  style: TextStyle(
+                  style: GoogleFonts.plusJakartaSans(
                     color: nearLimit
                         ? CiroColors.warning
                         : CiroColors.textMuted,
@@ -711,7 +781,13 @@ class _ComposerCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: posting ? CiroColors.textMuted : CiroColors.brand,
                     borderRadius: BorderRadius.circular(999),
-                    boxShadow: CiroColors.glowCyan,
+                    boxShadow: [
+                      BoxShadow(
+                        color: CiroColors.brand.withValues(alpha: 0.2),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   alignment: Alignment.center,
                   child: posting
@@ -723,9 +799,9 @@ class _ComposerCard extends StatelessWidget {
                             strokeWidth: 2,
                           ),
                         )
-                      : const Text(
+                      : Text(
                           'Post',
-                          style: TextStyle(
+                          style: GoogleFonts.plusJakartaSans(
                             color: Colors.white,
                             fontSize: 13,
                             fontWeight: FontWeight.w900,
@@ -737,12 +813,13 @@ class _ComposerCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.all(11),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: CiroColors.brand.withValues(alpha: 0.06),
+              color: CiroColors.brand.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
-                color: CiroColors.brand.withValues(alpha: 0.10),
+                color: CiroColors.brand.withValues(alpha: 0.08),
+                width: 1.0,
               ),
             ),
             child: Row(
@@ -751,10 +828,10 @@ class _ComposerCard extends StatelessWidget {
                 const SizedBox(width: 9),
                 Expanded(
                   child: Text(
-                    '$displayName - $displayRole',
+                    '$displayName • $displayRole',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: GoogleFonts.plusJakartaSans(
                       color: CiroColors.textSecondary,
                       fontSize: 11.5,
                       fontWeight: FontWeight.w800,
@@ -797,9 +874,15 @@ class _FilterTabs extends StatelessWidget {
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: CiroColors.borderLight),
-        boxShadow: CiroColors.cardShadow,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFF1F5F9), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: filters.map((filter) {
@@ -812,12 +895,21 @@ class _FilterTabs extends StatelessWidget {
                 height: 40,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  gradient: active ? CiroColors.brandGradient : null,
-                  borderRadius: BorderRadius.circular(14),
+                  color: active ? const Color(0xFF4E54E1) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: active
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFF4E54E1).withValues(alpha: 0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
                 ),
                 child: Text(
                   filter,
-                  style: TextStyle(
+                  style: GoogleFonts.plusJakartaSans(
                     color: active ? Colors.white : CiroColors.textSecondary,
                     fontSize: 12,
                     fontWeight: FontWeight.w900,
@@ -832,7 +924,7 @@ class _FilterTabs extends StatelessWidget {
   }
 }
 
-class _PostCard extends StatelessWidget {
+class _PostCard extends StatefulWidget {
   final _FeedPost post;
   final VoidCallback onLike;
   final VoidCallback onComment;
@@ -844,30 +936,93 @@ class _PostCard extends StatelessWidget {
   });
 
   @override
+  State<_PostCard> createState() => _PostCardState();
+}
+
+class _PostCardState extends State<_PostCard> with SingleTickerProviderStateMixin {
+  late AnimationController _likeController;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _likeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+    _scaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween<double>(begin: 1.0, end: 1.3), weight: 50),
+      TweenSequenceItem(tween: Tween<double>(begin: 1.3, end: 1.0), weight: 50),
+    ]).animate(_likeController);
+  }
+
+  @override
+  void dispose() {
+    _likeController.dispose();
+    super.dispose();
+  }
+
+  void _handleLike() {
+    if (!widget.post.liked) {
+      _likeController.forward(from: 0.0);
+    }
+    widget.onLike();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: _card(24),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFF1F5F9), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: post.color.withValues(alpha: 0.12),
-                backgroundImage: post.avatarImageData == null
-                    ? null
-                    : NetworkImage(post.avatarImageData!),
-                child: post.avatarImageData != null
-                    ? null
-                    : Icon(
-                        post.avatarIcon ?? Icons.person_rounded,
-                        color: post.avatarColor ?? post.color,
-                        size: 20,
-                      ),
+              Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: widget.post.isOfficial
+                        ? [const Color(0xFF5A5CE5), const Color(0xFF3B82F6)]
+                        : [const Color(0xFFC084FC), const Color(0xFF6366F1)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: CircleAvatar(
+                    radius: 20,
+                    backgroundColor: widget.post.color.withValues(alpha: 0.12),
+                    backgroundImage: _getAvatarImage(widget.post.avatarImageData),
+                    child: widget.post.avatarImageData != null
+                        ? null
+                        : Icon(
+                            widget.post.avatarIcon ?? Icons.person_rounded,
+                            color: widget.post.avatarColor ?? widget.post.color,
+                            size: 18,
+                          ),
+                  ),
+                ),
               ),
               const SizedBox(width: 11),
               Expanded(
@@ -878,21 +1033,21 @@ class _PostCard extends StatelessWidget {
                       children: [
                         Flexible(
                           child: Text(
-                            post.author,
+                            widget.post.author,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: GoogleFonts.plusJakartaSans(
                               color: CiroColors.textPrimary,
                               fontSize: 14,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
                         ),
-                        if (post.isOfficial) ...[
+                        if (widget.post.isOfficial) ...[
                           const SizedBox(width: 4),
                           Icon(
                             Icons.verified_rounded,
-                            color: post.color,
+                            color: widget.post.color,
                             size: 15,
                           ),
                         ],
@@ -900,10 +1055,10 @@ class _PostCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${post.handle} - ${post.time}',
+                      '${widget.post.handle} • ${widget.post.time}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: GoogleFonts.plusJakartaSans(
                         color: CiroColors.textMuted,
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -912,47 +1067,50 @@ class _PostCard extends StatelessWidget {
                   ],
                 ),
               ),
-              _Pill(icon: post.icon, label: post.tag, color: post.color),
+              _Pill(icon: widget.post.icon, label: widget.post.tag, color: widget.post.color),
             ],
           ),
           const SizedBox(height: 12),
           Text(
-            post.body,
-            style: const TextStyle(
+            widget.post.body,
+            style: GoogleFonts.plusJakartaSans(
               color: CiroColors.textPrimary,
-              fontSize: 14,
-              height: 1.42,
-              fontWeight: FontWeight.w700,
+              fontSize: 14.5,
+              height: 1.45,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 12),
-          _PostMedia(post: post),
+          _PostMedia(post: widget.post),
           const SizedBox(height: 12),
           Row(
             children: [
-              _SocialAction(
-                icon: post.liked
-                    ? Icons.favorite_rounded
-                    : Icons.favorite_border_rounded,
-                label: _compactCount(post.likes),
-                color: CiroColors.error,
-                active: post.liked,
-                onTap: onLike,
+              ScaleTransition(
+                scale: _scaleAnimation,
+                child: _SocialAction(
+                  icon: widget.post.liked
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  label: _compactCount(widget.post.likes),
+                  color: CiroColors.error,
+                  active: widget.post.liked,
+                  onTap: _handleLike,
+                ),
               ),
               const SizedBox(width: 12),
               _SocialAction(
                 icon: Icons.mode_comment_outlined,
-                label: _compactCount(post.comments.length),
+                label: _compactCount(widget.post.comments.length),
                 color: CiroColors.brand,
-                onTap: onComment,
+                onTap: widget.onComment,
               ),
               const Spacer(),
-              _ViewCount(count: post.views),
+              _ViewCount(count: widget.post.views),
             ],
           ),
-          if (post.comments.isNotEmpty) ...[
+          if (widget.post.comments.isNotEmpty) ...[
             const SizedBox(height: 10),
-            _LatestComment(comment: post.comments.last, color: post.color),
+            _LatestComment(comment: widget.post.comments.last, color: widget.post.color),
           ],
         ],
       ),
@@ -992,29 +1150,32 @@ class _PostMedia extends StatelessWidget {
     }
 
     return Container(
-      height: 176,
+      height: 160,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),
         gradient: LinearGradient(
           colors: [
-            post.imageTone.withValues(alpha: 0.18),
-            CiroColors.bg2,
-            post.imageTone.withValues(alpha: 0.10),
+            post.imageTone.withValues(alpha: 0.08),
+            const Color(0xFFF8FAFC),
+            post.imageTone.withValues(alpha: 0.04),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        border: Border.all(color: post.imageTone.withValues(alpha: 0.18)),
+        border: Border.all(color: post.imageTone.withValues(alpha: 0.08), width: 1.0),
       ),
       child: Stack(
         children: [
           Positioned(
-            right: -18,
-            top: -10,
-            child: Icon(
-              post.icon,
-              size: 126,
-              color: post.imageTone.withValues(alpha: 0.12),
+            right: -24,
+            top: -24,
+            child: Opacity(
+              opacity: 0.08,
+              child: Icon(
+                post.icon,
+                size: 156,
+                color: post.color,
+              ),
             ),
           ),
           Positioned(
@@ -1033,20 +1194,20 @@ class _PostMedia extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 48,
-                  height: 48,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
-                    color: post.color,
-                    borderRadius: BorderRadius.circular(18),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
                     boxShadow: [
                       BoxShadow(
-                        color: post.color.withValues(alpha: 0.22),
-                        blurRadius: 18,
-                        offset: const Offset(0, 8),
+                        color: post.color.withValues(alpha: 0.12),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
-                  child: Icon(post.icon, color: Colors.white, size: 25),
+                  child: Icon(post.icon, color: post.color, size: 22),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -1057,18 +1218,18 @@ class _PostMedia extends StatelessWidget {
                         post.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: GoogleFonts.plusJakartaSans(
                           color: CiroColors.textPrimary,
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'CIRO is comparing this with nearby crisis signals',
+                      const SizedBox(height: 3),
+                      Text(
+                        'CIRO active threat signals verified',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
+                        style: GoogleFonts.plusJakartaSans(
                           color: CiroColors.textSecondary,
                           fontSize: 11.5,
                           fontWeight: FontWeight.w700,
@@ -1276,22 +1437,29 @@ class _LatestComment extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: CiroColors.bg2,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: CiroColors.borderLight),
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF1F5F9), width: 1.0),
       ),
       child: Row(
         children: [
-          Icon(Icons.mode_comment_outlined, color: color, size: 16),
+          CircleAvatar(
+            radius: 10,
+            backgroundColor: color.withValues(alpha: 0.12),
+            child: Text(
+              comment.author.characters.first.toUpperCase(),
+              style: TextStyle(color: color, fontSize: 8, fontWeight: FontWeight.w900),
+            ),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              '${comment.author}: ${comment.text}',
+              '${comment.handle}: ${comment.text}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: GoogleFonts.plusJakartaSans(
                 color: CiroColors.textSecondary,
                 fontSize: 11.5,
                 fontWeight: FontWeight.w700,
@@ -1325,11 +1493,14 @@ class _TypeChip extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.11) : Colors.white,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: selected ? color : CiroColors.border),
+          color: selected ? color.withValues(alpha: 0.08) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? color : const Color(0xFFE2E8F0),
+            width: selected ? 1.5 : 1.0,
+          ),
         ),
         child: Row(
           children: [
@@ -1341,9 +1512,9 @@ class _TypeChip extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               label,
-              style: TextStyle(
+              style: GoogleFonts.plusJakartaSans(
                 color: selected ? color : CiroColors.textPrimary,
-                fontSize: 11,
+                fontSize: 11.5,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -1377,12 +1548,25 @@ class _ProfileAvatar extends StatelessWidget {
     return CircleAvatar(
       radius: radius,
       backgroundColor: color.withValues(alpha: 0.12),
-      backgroundImage: image == null ? null : NetworkImage(image),
+      backgroundImage: _getAvatarImage(image),
       child: image != null
           ? null
           : Icon(icon, color: color, size: radius * 0.92),
     );
   }
+}
+
+ImageProvider? _getAvatarImage(String? image) {
+  if (image == null || image.isEmpty) return null;
+  if (image.startsWith('data:image')) {
+    try {
+      final base64String = image.split(',').last;
+      return MemoryImage(base64Decode(base64String));
+    } catch (_) {
+      return NetworkImage(image);
+    }
+  }
+  return NetworkImage(image);
 }
 
 class _ComposerAction extends StatelessWidget {
@@ -1493,10 +1677,11 @@ class _Pill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       constraints: const BoxConstraints(maxWidth: 156),
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(999),
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.18), width: 1.0),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1508,10 +1693,10 @@ class _Pill extends StatelessWidget {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
+              style: GoogleFonts.plusJakartaSans(
                 color: color,
-                fontSize: 10.5,
-                fontWeight: FontWeight.w900,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),

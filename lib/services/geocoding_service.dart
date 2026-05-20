@@ -31,7 +31,7 @@ class GeocodingService {
         '$_baseUrl?latlng=${base.latitude},${base.longitude}'
         '&key=${AppConfig.instance.googleMapsApiKey}',
       );
-      final resp = await http.get(uri).timeout(const Duration(seconds: 8));
+      final resp = await http.get(uri).timeout(const Duration(milliseconds: 3500));
       if (resp.statusCode != 200) {
         return _withCoords(base,
             address: 'Geocoding error ${resp.statusCode}');
@@ -86,7 +86,7 @@ class GeocodingService {
       final resp = await http.get(
         uri,
         headers: {'User-Agent': 'CIRO-Crisis-Response-App'},
-      ).timeout(const Duration(seconds: 8));
+      ).timeout(const Duration(milliseconds: 3500));
 
       if (resp.statusCode != 200) {
         return _withCoords(base, address: 'OSM Geocoding error ${resp.statusCode}');

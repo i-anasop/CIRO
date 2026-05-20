@@ -11,7 +11,6 @@ import '../services/geocoding_service.dart';
 import '../services/scenario_engine.dart';
 import '../services/app_mode_service.dart';
 import '../models/location_result.dart';
-import '../theme/colors.dart';
 
 enum SelectionMode { live, demo }
 enum LocationState { initial, scanning, success, error }
@@ -102,300 +101,308 @@ class _LocationScreenState extends State<LocationScreen>
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     final isSuccess = _state == LocationState.success;
     final isScanning = _state == LocationState.scanning;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            // Check if constraints are extremely tight (e.g. height < 640)
-            final bool useScroll = constraints.maxHeight < 640;
-            
-            final content = Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Header Block (badge, title, subtitle)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      const SizedBox(height: 6),
-                      // GET STARTED badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEEF2FF),
-                          borderRadius: BorderRadius.circular(100),
-                          border: Border.all(
-                            color: const Color(0xFFE0E7FF),
-                            width: 1.0,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.auto_awesome_rounded,
-                              color: Color(0xFF4F46E5),
-                              size: 12,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'GET STARTED',
-                              style: GoogleFonts.inter(
-                                color: const Color(0xFF4F46E5),
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1.0,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'Choose Your Location',
-                        style: GoogleFonts.outfit(
-                          color: const Color(0xFF0F172A),
-                          fontSize: 26,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.5,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 6),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text(
-                          'Use your live GPS location or start with the G-10 Islamabad demo area.',
-                          style: GoogleFonts.inter(
-                            color: const Color(0xFF475569),
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w500,
-                            height: 1.3,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  // Isometric illustration (Optimized size: 120px)
-                  SizedBox(
-                    height: 120,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Positioned.fill(
-                          child: CustomPaint(
-                            painter: HeaderIsometricPainter(),
-                          ),
-                        ),
-                        // Floating bubbles
-                        Positioned(
-                          left: 36,
-                          top: 40,
-                          child: _buildFloatingBubble(
-                            icon: Icons.wb_cloudy_rounded,
-                            color: Colors.blueAccent,
-                          ),
-                        ),
-                        Positioned(
-                          right: 40,
-                          top: 25,
-                          child: _buildFloatingBubble(
-                            icon: Icons.sensors_rounded,
-                            color: const Color(0xFF3B82F6),
-                          ),
-                        ),
-                        Positioned(
-                          right: 50,
-                          bottom: 20,
-                          child: _buildFloatingBubble(
-                            icon: Icons.shield_rounded,
-                            color: const Color(0xFF4F46E5),
-                          ),
-                        ),
-                        // Glowing gradient Pin (scaled down to Size(40, 52))
-                        Positioned(
-                          top: 15,
-                          child: AnimatedBuilder(
-                            animation: _pulseCtrl,
-                            builder: (context, child) {
-                              final hoverOffset = math.sin(_pulseCtrl.value * math.pi * 2) * 3;
-                              return Transform.translate(
-                                offset: Offset(0, hoverOffset),
-                                child: CustomPaint(
-                                  size: const Size(40, 52),
-                                  painter: GradientLocationPinPainter(),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Selection Cards
-                  Column(
-                    children: [
-                      // Card 1: My Location
-                      _buildOptionCard(
-                        mode: SelectionMode.live,
-                        title: 'My Current Location (Live)',
-                        subtitle: isSuccess
-                            ? 'Connected to GPS! Location resolved.'
-                            : 'Use your GPS for real-time weather, traffic, and nearby crisis signals.',
-                        icon: Icons.track_changes_rounded,
-                        accentColor: isSuccess ? const Color(0xFF10B981) : const Color(0xFF0EA5E9),
-                        badgeText: 'GPS READY',
-                        panelChild: isSuccess
-                            ? null
-                            : (isScanning ? _buildScanningVisual() : _buildLiveVisual()),
-                      ),
-
-                      if (isSuccess) ...[
-                        const SizedBox(height: 10),
-                        _buildSuccessVisual(),
-                      ],
-
-                      const SizedBox(height: 12),
-
-                      // Card 2: Islamabad G-10
-                      _buildOptionCard(
-                        mode: SelectionMode.demo,
-                        title: 'Islamabad G-10 (Demo)',
-                        subtitle: 'Guided walkthrough with preloaded signals and sample data.',
-                        icon: Icons.map_rounded,
-                        accentColor: const Color(0xFF8B5CF6),
-                        badgeText: 'FOR TESTING',
-                        panelChild: _buildDemoVisual(),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // Bottom Button & Footnote
-                  Column(
+      body: Stack(
+        children: [
+          // Background decorative blobs (matching LoginScreen style)
+          Positioned(
+            top: -150,
+            left: -150,
+            child: Container(
+              width: 400,
+              height: 400,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF4F46E5).withValues(alpha: 0.06),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -100,
+            right: -100,
+            child: Container(
+              width: 350,
+              height: 350,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF8B5CF6).withValues(alpha: 0.04),
+              ),
+            ),
+          ),
+          // Scrollable layout builder
+          SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final bool useScroll = constraints.maxHeight < 620;
+                
+                final content = Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Container(
-                        height: 52,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14),
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF2563EB), Color(0xFF4F46E5)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF4F46E5).withValues(alpha: 0.2),
-                              blurRadius: 12,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: ElevatedButton(
-                          onPressed: isScanning ? null : _handleContinue,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                          child: isScanning
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.0,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      // Header Branding & Title Block
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const SizedBox(height: 12),
+                          // Breathing glow outer ring with Location Pin icon
+                          Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              AnimatedBuilder(
+                                animation: _pulseCtrl,
+                                builder: (context, child) {
+                                  final glowScaleVal = 0.88 + (_pulseCtrl.value * 0.22);
+                                  return Transform.scale(
+                                    scale: glowScaleVal,
+                                    child: Container(
+                                      width: 100,
+                                      height: 100,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        gradient: RadialGradient(
+                                          colors: [
+                                            const Color(0xFF4F46E5).withValues(alpha: 0.20),
+                                            const Color(0xFF4F46E5).withValues(alpha: 0.0),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              Container(
+                                width: 78,
+                                height: 78,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white,
+                                  border: Border.all(
+                                    color: const Color(0xFFE2E8F0),
+                                    width: 1.5,
                                   ),
-                                )
-                              : Text(
-                                  isSuccess && _selection == SelectionMode.live
-                                      ? 'Enter Command Center'
-                                      : 'Continue',
-                                  style: GoogleFonts.inter(
-                                    color: Colors.white,
-                                    fontSize: 15.5,
-                                    fontWeight: FontWeight.w700,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF4F46E5).withValues(alpha: 0.12),
+                                      blurRadius: 24,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.location_on_rounded,
+                                    color: Color(0xFF4F46E5),
+                                    size: 34,
                                   ),
                                 ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.info_outline_rounded,
-                            color: Color(0xFF94A3B8),
-                            size: 13,
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(height: 24),
+                          // GET STARTED badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEEF2FF),
+                              borderRadius: BorderRadius.circular(100),
+                              border: Border.all(
+                                color: const Color(0xFFE0E7FF),
+                                width: 1.0,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.auto_awesome_rounded,
+                                  color: Color(0xFF4F46E5),
+                                  size: 11,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'GET STARTED',
+                                  style: GoogleFonts.inter(
+                                    color: const Color(0xFF4F46E5),
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.0,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
                           Text(
-                            'You can change this anytime in Settings.',
-                            style: GoogleFonts.inter(
-                              color: const Color(0xFF94A3B8),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
+                            'Choose Your Location',
+                            style: GoogleFonts.outfit(
+                              color: const Color(0xFF0F172A),
+                              fontSize: 25,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.5,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Text(
+                              'Use your live GPS location or start with the G-10 Islamabad demo area.',
+                              style: GoogleFonts.inter(
+                                color: const Color(0xFF475569),
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w500,
+                                height: 1.35,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
+
+                      const SizedBox(height: 12),
+
+                      // Selection Cards Container
+                      Column(
+                        children: [
+                          // Card 1: My Location
+                          _buildOptionCard(
+                            mode: SelectionMode.live,
+                            title: 'My Current Location (Live)',
+                            subtitle: isSuccess
+                                ? 'Connected to GPS! Location resolved.'
+                                : 'Use your GPS for real-time weather, traffic, and nearby crisis signals.',
+                            icon: Icons.track_changes_rounded,
+                            accentColor: isSuccess ? const Color(0xFF10B981) : const Color(0xFF0EA5E9),
+                            badgeText: isScanning ? null : 'GPS READY',
+                            isLoading: isScanning,
+                          ),
+
+                          if (isSuccess) ...[
+                            const SizedBox(height: 12),
+                            _buildSuccessVisual(),
+                          ],
+
+                          const SizedBox(height: 12),
+
+                          // Card 2: Islamabad G-10
+                          _buildOptionCard(
+                            mode: SelectionMode.demo,
+                            title: 'Islamabad G-10 (Demo)',
+                            subtitle: 'Guided walkthrough with preloaded signals and sample data.',
+                            icon: Icons.map_rounded,
+                            accentColor: const Color(0xFF8B5CF6),
+                            badgeText: 'FOR TESTING',
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Bottom Button & Footnote
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Container(
+                            height: 52,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF2563EB), Color(0xFF4F46E5)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF4F46E5).withValues(alpha: 0.2),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: ElevatedButton(
+                              onPressed: isScanning ? null : _handleContinue,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: isScanning
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.0,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    )
+                                  : Text(
+                                      isSuccess && _selection == SelectionMode.live
+                                          ? 'Enter Command Center'
+                                          : 'Continue',
+                                      style: GoogleFonts.inter(
+                                        color: Colors.white,
+                                        fontSize: 15.5,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.info_outline_rounded,
+                                color: Color(0xFF94A3B8),
+                                size: 13,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'You can change this anytime in Settings.',
+                                style: GoogleFonts.inter(
+                                  color: const Color(0xFF94A3B8),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                        ],
+                      ),
                     ],
                   ),
-                ],
-              ),
-            );
+                );
 
-            // Wrap in SingleChildScrollView only if layout height is very small to prevent any overflow.
-            if (useScroll) {
-              return SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                  child: content,
-                ),
-              );
-            }
+                if (useScroll) {
+                  return SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                      child: content,
+                    ),
+                  );
+                }
 
-            return content;
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFloatingBubble({required IconData icon, required Color color}) {
-    return Container(
-      padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+                return content;
+              },
+            ),
           ),
         ],
       ),
-      child: Icon(icon, color: color.withValues(alpha: 0.8), size: 13),
     );
   }
 
@@ -406,7 +413,7 @@ class _LocationScreenState extends State<LocationScreen>
     required IconData icon,
     required Color accentColor,
     String? badgeText,
-    Widget? panelChild,
+    bool isLoading = false,
   }) {
     final isSelected = _selection == mode;
 
@@ -418,24 +425,24 @@ class _LocationScreenState extends State<LocationScreen>
         duration: const Duration(milliseconds: 150),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFFF0F4FF)
+              ? const Color(0xFFF5F7FF)
               : (_hoveredMode == mode ? const Color(0xFFF8FAFC) : Colors.white),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
-                ? const Color(0xFF3B82F6)
+                ? const Color(0xFF4F46E5)
                 : (_hoveredMode == mode ? const Color(0xFFCBD5E1) : const Color(0xFFE2E8F0)),
             width: isSelected ? 2.0 : 1.0,
           ),
           boxShadow: [
             BoxShadow(
               color: isSelected
-                  ? const Color(0xFF3B82F6).withValues(alpha: 0.05)
+                  ? const Color(0xFF4F46E5).withValues(alpha: 0.05)
                   : (_hoveredMode == mode
                       ? Colors.black.withValues(alpha: 0.02)
                       : Colors.black.withValues(alpha: 0.01)),
-              blurRadius: isSelected ? 10 : 8,
-              offset: const Offset(0, 3),
+              blurRadius: isSelected ? 12 : 8,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -455,207 +462,121 @@ class _LocationScreenState extends State<LocationScreen>
             highlightColor: Colors.transparent,
             splashColor: accentColor.withValues(alpha: 0.05),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: accentColor.withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Center(
-                          child: Icon(icon, color: accentColor, size: 20),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              title,
-                              style: GoogleFonts.inter(
-                                color: const Color(0xFF0F172A),
-                                fontSize: 15.5,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              subtitle,
-                              style: GoogleFonts.inter(
-                                color: const Color(0xFF64748B),
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w500,
-                                height: 1.3,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Top Right components (Badge + Radio Button)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (badgeText != null) ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: accentColor.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: accentColor.withValues(alpha: 0.15),
-                                  width: 1.0,
-                                ),
-                              ),
-                              child: Text(
-                                badgeText,
-                                style: GoogleFonts.inter(
-                                  color: accentColor,
-                                  fontSize: 8.5,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.3,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          Container(
-                            width: 20,
-                            height: 20,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isSelected ? const Color(0xFF3B82F6) : const Color(0xFFCBD5E1),
-                                width: isSelected ? 6.0 : 2.0,
-                              ),
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: Icon(icon, color: accentColor, size: 22),
+                    ),
                   ),
-                if (panelChild != null) ...[
-                  const SizedBox(height: 10),
-                  // Panel Child (Optimized size: 60px height)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      height: 60,
-                      color: const Color(0xFFF8FAFC),
-                      child: panelChild,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                title,
+                                style: GoogleFonts.inter(
+                                  color: const Color(0xFF0F172A),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            if (badgeText != null || isLoading) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: accentColor.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: accentColor.withValues(alpha: 0.15),
+                                    width: 1.0,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (isLoading) ...[
+                                      SizedBox(
+                                        width: 8,
+                                        height: 8,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 1.5,
+                                          valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                    ],
+                                    Text(
+                                      isLoading ? 'ACQUIRING...' : badgeText!,
+                                      style: GoogleFonts.inter(
+                                        color: accentColor,
+                                        fontSize: 8.5,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.3,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          subtitle,
+                          style: GoogleFonts.inter(
+                            color: const Color(0xFF64748B),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFFCBD5E1),
+                        width: isSelected ? 7.0 : 2.0,
+                      ),
+                      color: Colors.white,
                     ),
                   ),
                 ],
-              ],
+              ),
             ),
           ),
         ),
       ),
-    ),
-  );
-}
-
-  Widget _buildDemoVisual() {
-    return AnimatedBuilder(
-      animation: _pulseCtrl,
-      builder: (context, child) {
-        return CustomPaint(
-          painter: CardPanelPainter(
-            color: const Color(0xFF8B5CF6),
-            isDemo: true,
-            pulseValue: _pulseCtrl.value,
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildLiveVisual() {
-    return AnimatedBuilder(
-      animation: _pulseCtrl,
-      builder: (context, child) {
-        return CustomPaint(
-          painter: CardPanelPainter(
-            color: const Color(0xFF0EA5E9),
-            isDemo: false,
-            isSuccess: false,
-            pulseValue: _pulseCtrl.value,
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildScanningVisual() {
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: AnimatedBuilder(
-            animation: _pulseCtrl,
-            builder: (context, child) {
-              return CustomPaint(
-                painter: CardPanelPainter(
-                  color: const Color(0xFF3B82F6),
-                  isDemo: false,
-                  isScanning: true,
-                  pulseValue: _pulseCtrl.value,
-                ),
-              );
-            },
-          ),
-        ),
-        Center(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(
-                  width: 10,
-                  height: 10,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 1.5,
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3B82F6)),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'ACQUIRING POSITION...',
-                  style: GoogleFonts.inter(
-                    color: const Color(0xFF3B82F6),
-                    fontSize: 8.5,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 
   Widget _buildSuccessVisual() {
     final isMock = _detectedLocation?.isMock == true;
     return Container(
-      height: 74,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: isMock ? const Color(0xFFFFFBEB) : const Color(0xFFECFDF5),
         borderRadius: BorderRadius.circular(14),
@@ -664,81 +585,57 @@ class _LocationScreenState extends State<LocationScreen>
           width: 1.0,
         ),
       ),
-      child: Stack(
+      child: Row(
         children: [
-          Positioned.fill(
-            child: AnimatedBuilder(
-              animation: _pulseCtrl,
-              builder: (context, child) {
-                return CustomPaint(
-                  painter: CardPanelPainter(
-                    color: isMock ? const Color(0xFFD97706) : CiroColors.low,
-                    isDemo: false,
-                    isSuccess: true,
-                    pulseValue: _pulseCtrl.value,
-                  ),
-                );
-              },
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: isMock ? const Color(0xFFFEF3C7) : const Color(0xFFD1FAE5),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isMock ? Icons.warning_amber_rounded : Icons.check_circle_rounded,
+              color: isMock ? const Color(0xFFD97706) : const Color(0xFF059669),
+              size: 20,
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            alignment: Alignment.center,
-            child: Row(
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: isMock ? const Color(0xFFFEF3C7) : const Color(0xFFD1FAE5),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    isMock ? Icons.warning_amber_rounded : Icons.location_on_rounded,
-                    color: isMock ? const Color(0xFFD97706) : const Color(0xFF059669),
-                    size: 20,
+                Text(
+                  isMock ? 'FALLBACK ACTIVE (GPS BLOCKED/TIMEOUT)' : 'ACQUIRED ADDRESS',
+                  style: GoogleFonts.inter(
+                    color: isMock ? const Color(0xFFB45309) : const Color(0xFF059669),
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isMock ? 'FALLBACK ACTIVE (GPS BLOCKED/TIMEOUT)' : 'ACQUIRED ADDRESS',
-                        style: GoogleFonts.inter(
-                          color: isMock ? const Color(0xFFB45309) : const Color(0xFF059669),
-                          fontSize: 8.5,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _detectedLocation?.displayLabel ?? 'H-13, Islamabad',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          color: isMock ? const Color(0xFF92400E) : const Color(0xFF065F46),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        isMock
-                            ? 'GPS unavailable - click lock icon in browser address bar to allow location'
-                            : (_detectedLocation?.address ?? 'Sector H-13, Islamabad, Pakistan'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          color: isMock ? const Color(0xFFB45309) : const Color(0xFF047857),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
+                const SizedBox(height: 2),
+                Text(
+                  _detectedLocation?.displayLabel ?? 'H-13, Islamabad',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    color: const Color(0xFF0F172A),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  isMock
+                      ? 'GPS unavailable - click lock icon in browser address bar to allow location'
+                      : (_detectedLocation?.address ?? 'Sector H-13, Islamabad, Pakistan'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    color: isMock ? const Color(0xFFB45309) : const Color(0xFF047857),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
@@ -1059,6 +956,12 @@ class CardPanelPainter extends CustomPainter {
       // Center dot
       canvas.drawCircle(centerPt, 3.5, Paint()..color = color);
     } else {
+      if (isSuccess) {
+        // Keep the acquired address card extremely clean and readable.
+        // Avoid drawing the road, sweeping radar, and blue/red node dots which overlap with text.
+        return;
+      }
+
       // Draw simulated road (double line or clean path)
       final roadPaint = Paint()
         ..color = color.withValues(alpha: 0.1)

@@ -5,6 +5,7 @@ import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/material.dart';
 
+import '../services/scenario_engine.dart';
 import '../theme/colors.dart';
 import '../theme/typography.dart';
 
@@ -46,7 +47,7 @@ Widget createInteractiveMap({
       Positioned(
         top: 12,
         left: 12,
-        child: _MapBadge(label: _label(latitude, longitude)),
+        child: _MapBadge(label: '${_label(latitude, longitude)} • $selectedLayer'),
       ),
     ],
   );
@@ -68,12 +69,21 @@ String _query(double latitude, double longitude, String selectedLayer) {
   if (isG10) {
     return switch (selectedLayer) {
       'Traffic' => 'traffic near G-10 Markaz Islamabad',
-      'Shelters' => 'hospitals and shelters near G-10 Islamabad',
-      'Units' => 'fire station police station near G-10 Islamabad',
+      'Flood Risk' => 'drainage nullah streams canals near G-10 Islamabad',
+      'Shelters' => 'hospitals medical shelters near G-10 Islamabad',
+      'Units' => 'rescue services fire police near G-10 Islamabad',
       _ => 'G-10 Islamabad Pakistan',
     };
   }
-  return '$latitude,$longitude';
+  final crisis = ScenarioEngine.instance.activeCrisis;
+  final loc = crisis.location.isNotEmpty ? crisis.location : '$latitude,$longitude';
+  return switch (selectedLayer) {
+    'Traffic' => 'traffic near $loc',
+    'Flood Risk' => 'drainage nullah streams canals near $loc',
+    'Shelters' => 'hospitals medical shelters near $loc',
+    'Units' => 'rescue services fire police near $loc',
+    _ => loc,
+  };
 }
 
 String _label(double latitude, double longitude) {

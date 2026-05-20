@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../services/user_profile_service.dart';
@@ -47,6 +48,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (result != null) {
       setState(() {
         _customUrl = result;
+        _isProfileEditing = true;
         _noticeTitle = 'Profile photo ready';
         _noticeSubtitle = 'Save your profile to keep this picture locally.';
         _noticeIcon = Icons.photo_camera_rounded;
@@ -78,6 +80,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _noticeSubtitle = null;
       });
     }
+  }
+
+  ImageProvider? _getAvatarImage(String? image) {
+    if (image == null || image.isEmpty) return null;
+    if (image.startsWith('data:image')) {
+      try {
+        final base64String = image.split(',').last;
+        return MemoryImage(base64Decode(base64String));
+      } catch (_) {
+        return NetworkImage(image);
+      }
+    }
+    return NetworkImage(image);
   }
 
   // Avatar badge configs exactly matching premium crisis responder roles
@@ -161,6 +176,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            onPressed: () {
+              if (_isProfileEditing == true) {
+                _saveProfileInPlace();
+              } else {
+                setState(() {
+                  _isProfileEditing = true;
+                });
+              }
+            },
+            icon: Icon(
+              (_isProfileEditing == true)
+                  ? Icons.check_rounded
+                  : Icons.edit_rounded,
+              color: (_isProfileEditing == true)
+                  ? const Color(0xFF10B981)
+                  : const Color(0xFF4F46E5),
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -218,8 +256,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                               child: _customUrl != null
                                   ? ClipOval(
-                                      child: Image.network(
-                                        _customUrl!,
+                                      child: Image(
+                                        image: _getAvatarImage(_customUrl)!,
                                         fit: BoxFit.cover,
                                         errorBuilder: (_, __, ___) => Icon(
                                           UserProfileService
@@ -385,6 +423,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 onTap: () => setState(() {
                                   _selectedIndex = index;
                                   _customUrl = null;
+                                  _isProfileEditing = true;
                                 }),
                                 child: Stack(
                                   clipBehavior: Clip.none,
@@ -537,26 +576,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ],
                           ),
                         ),
-                        IconButton(
-                          onPressed: () {
-                            if (_isProfileEditing == true) {
-                              _saveProfileInPlace();
-                            } else {
-                              setState(() {
-                                _isProfileEditing = true;
-                              });
-                            }
-                          },
-                          icon: Icon(
-                            (_isProfileEditing == true)
-                                ? Icons.check_rounded
-                                : Icons.edit_rounded,
-                            color: (_isProfileEditing == true)
-                                ? const Color(0xFF10B981)
-                                : const Color(0xFF4F46E5),
-                            size: 22,
-                          ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -583,8 +602,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 32),
-
               const SizedBox(height: 24),
             ],
           ),

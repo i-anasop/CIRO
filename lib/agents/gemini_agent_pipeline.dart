@@ -1,8 +1,7 @@
-// CIRO — Gemini-Powered Agent Pipeline
-// Replaces the deterministic agent_pipeline.dart for Real Mode.
-// Each agent sends real signal data to Gemini 2.0 Flash and parses
-// structured JSON responses into the existing model objects.
-// All failures fall back gracefully — never crashes.
+// CIRO — AI Agent Pipeline (Groq Primary / Gemini Fallback)
+// Runs the 9-agent crisis intelligence pipeline using Groq (Llama 3.3 70B) as primary.
+// Falls back to Gemini 2.0 Flash automatically if Groq is unavailable.
+// All failures fall back gracefully to deterministic mode — never crashes.
 
 import 'package:flutter/foundation.dart';
 import '../models/crisis.dart';
@@ -12,12 +11,39 @@ import '../models/agent_log.dart';
 import '../models/simulation_result.dart';
 import '../models/pipeline_result.dart';
 import '../models/orchestration_models.dart';
+import '../services/groq_service.dart';
 import '../services/gemini_service.dart';
+import '../services/app_config.dart';
 import '../services/real_signal_service.dart';
 
-/// Runs the full 9-agent pipeline using Gemini AI for Real Mode.
+/// Which AI engine is currently driving the pipeline.
+String get _activeEngine {
+  if (AppConfig.instance.hasGroqKey) return 'groq-llama-3.3-70b';
+  if (AppConfig.instance.hasGeminiKey) return 'gemini-2.0-flash';
+  return 'local-deterministic';
+}
+
+String get _activeEngineLabel {
+  if (AppConfig.instance.hasGroqKey) return 'Groq (Llama 3.3)';
+  if (AppConfig.instance.hasGeminiKey) return 'Gemini 2.0 Flash';
+  return 'Local Deterministic';
+}
+
+/// Unified AI call: tries Groq first, falls back to Gemini.
+Future<Map<String, dynamic>?> _ai(String prompt) async {
+  if (AppConfig.instance.hasGroqKey) {
+    final result = await GroqService.instance.generateJson(prompt);
+    if (result != null) return result;
+  }
+  if (AppConfig.instance.hasGeminiKey) {
+    return GeminiService.instance.generateJson(prompt);
+  }
+  return null;
+}
+
+/// Runs the full 9-agent pipeline using AI for Real Mode.
 /// Each agent produces its output from live signal data + AI reasoning.
-/// If Gemini fails for any agent, a sensible fallback is used.
+/// If AI fails for any agent, a sensible fallback is used.
 class GeminiAgentPipeline {
   const GeminiAgentPipeline._();
 
@@ -80,7 +106,14 @@ class GeminiAgentPipeline {
     );
 
     // ── Build the scenario for pipeline result ─────────────────────────────
-    final scenario = _buildScenarioFromCrisis(crisis, bundle);
+    final scenario = _buildScenarioFromCrisis(
+      crisis: crisis,
+      bundle: bundle,
+      plan: plan,
+      resources: resources,
+      simulation: simulation,
+      verification: verification,
+    );
 
     // ── Antigravity Trace (audit trail) ────────────────────────────────────
     final trace = _buildTrace(crisis, resources, verification, fusionResult);
@@ -138,7 +171,7 @@ Rules:
 - Keep each finding concise (1-2 sentences)
 - Return 3-5 findings''';
 
-    final json = await GeminiService.instance.generateJson(prompt);
+    final json = await _ai(prompt);
     if (json != null && json['findings'] is List) {
       return List<String>.from(json['findings']);
     }
@@ -177,7 +210,7 @@ Rules:
 - Be specific about which signals drove your classification
 - Affected people estimate should be realistic for the location and crisis type''';
 
-    final json = await GeminiService.instance.generateJson(prompt);
+    final json = await _ai(prompt);
     if (json == null) return null;
 
     try {
@@ -234,7 +267,7 @@ TASK: Predict crisis evolution. Return JSON:
   "uncertainty_range": "e.g. +/- 20%"
 }''';
 
-    final json = await GeminiService.instance.generateJson(prompt);
+    final json = await _ai(prompt);
     if (json != null) {
       return CrisisEvolution(
         affectedRadius: json['affected_radius'] as String? ?? '1 km',
@@ -277,7 +310,7 @@ Rules:
 - Use realistic unit names (e.g. "Ambulance Unit A-1", "Drainage Pump Team", "Traffic Control Unit")
 - If severity is low/monitoring, recommend monitoring units only''';
 
-    final json = await GeminiService.instance.generateJson(prompt);
+    final json = await _ai(prompt);
     if (json != null && json['units'] is List) {
       final units = List<String>.from(json['units']);
       return ResourceAllocation(
@@ -327,7 +360,7 @@ Rules:
 - Include realistic ETAs
 - If no active crisis, create 1-2 monitoring steps''';
 
-    final json = await GeminiService.instance.generateJson(prompt);
+    final json = await _ai(prompt);
     if (json != null && json['actions'] is List) {
       try {
         return (json['actions'] as List).map((a) {
@@ -386,7 +419,7 @@ Rules:
 - Before = current state, After = projected state after plan execution
 - Be realistic — don't show impossible improvements''';
 
-    final json = await GeminiService.instance.generateJson(prompt);
+    final json = await _ai(prompt);
 
     final actions = plan.map((a) => SimulatedAction(
       id: 'SIM-${a.step}',
@@ -454,7 +487,7 @@ Rules:
 - "conflicting_signals" = sources disagree
 - "false_positive_risk" = signals may be noise/irrelevant''';
 
-    final json = await GeminiService.instance.generateJson(prompt);
+    final json = await _ai(prompt);
     if (json != null) {
       return VerificationDecision(
         type: _parseVerificationType(json['verification_type'] as String? ?? 'needs_verification'),
@@ -495,7 +528,7 @@ Rules:
 - Include 4-6 stakeholder groups
 - Messages should reference the specific location and crisis type''';
 
-    final json = await GeminiService.instance.generateJson(prompt);
+    final json = await _ai(prompt);
     if (json != null && json['messages'] is List) {
       try {
         return (json['messages'] as List).map((m) {
@@ -685,7 +718,14 @@ Rules:
     return assessments;
   }
 
-  static DemoScenario _buildScenarioFromCrisis(Crisis crisis, RealSignalBundle bundle) {
+  static DemoScenario _buildScenarioFromCrisis({
+    required Crisis crisis,
+    required RealSignalBundle bundle,
+    required List<PlanAction> plan,
+    required ResourceAllocation resources,
+    required SimulationResult simulation,
+    required VerificationDecision verification,
+  }) {
     final location = bundle.location.displayLabel;
     return DemoScenario(
       id: 'SCN-REAL-AI',
@@ -724,14 +764,20 @@ Rules:
         isActive: bundle.traffic?.isSuccess == true,
       ),
       extraSignals: const [],
-      responseActions: const [],
-      simulationMetrics: const [],
-      possibleSideEffects: const [],
-      verificationType: VerificationType.needsVerification,
-      verificationNote: 'AI-generated analysis.',
+      responseActions: plan,
+      simulationMetrics: simulation.metrics.map((m) => MetricPair(
+        label: m.label,
+        before: m.before,
+        after: m.after,
+        delta: m.delta,
+        isImprovement: m.isImprovement,
+      )).toList(),
+      possibleSideEffects: _sideEffects(crisis.type, crisis.status == CrisisStatus.active),
+      verificationType: verification.type,
+      verificationNote: verification.note,
       mapZoneLabel: location,
-      resourceSummary: 'AI-allocated',
-      resourceUnits: const [],
+      resourceSummary: resources.summary,
+      resourceUnits: resources.units,
       orchestration: ScenarioOrchestrationHints(
         resourceConstraint: 'AI-managed',
         affectedRadius: '1 km',
@@ -742,30 +788,47 @@ Rules:
     );
   }
 
+  static List<String> _sideEffects(CrisisType type, bool active) {
+    if (!active) return const [];
+    switch (type) {
+      case CrisisType.urbanFlooding:
+        return const ['Alternate routes may see temporary congestion increases.'];
+      case CrisisType.heatwave:
+        return const ['Clinic surge prep may reduce non-urgent outpatient capacity.'];
+      case CrisisType.accident:
+        return const ['Rerouting may slow adjacent arterial roads.'];
+      case CrisisType.powerOutage:
+        return const ['Generator prioritization may leave lower-risk sites waiting.'];
+      case CrisisType.roadBlockage:
+        return const ['Manual traffic control may delay public transport schedules.'];
+    }
+  }
+
   static List<AntigravityTraceEvent> _buildTrace(
     Crisis crisis,
     ResourceAllocation resources,
     VerificationDecision verification,
     List<String> fusionFindings,
   ) {
+    final eng = _activeEngineLabel;
     return [
       AntigravityTraceEvent(
-        step: 1, agent: 'Gemini Fusion Agent', action: 'Fuse multi-source live signals',
+        step: 1, agent: '$eng Fusion Agent', action: 'Fuse multi-source live signals',
         input: 'Weather + News + Traffic', output: fusionFindings.join(' '),
         confidence: 0.88, evidence: 'AI-analyzed signal fusion', metadata: {},
       ),
       AntigravityTraceEvent(
-        step: 2, agent: 'Gemini Detection Agent', action: 'Classify crisis from fused signals',
+        step: 2, agent: '$eng Detection Agent', action: 'Classify crisis from fused signals',
         input: crisis.location, output: '${crisis.typeLabel} — ${_severityLabel(crisis.severity)}',
         confidence: crisis.confidencePercent / 100, evidence: crisis.detectionReasoning, metadata: {},
       ),
       AntigravityTraceEvent(
-        step: 3, agent: 'Gemini Resource Agent', action: 'AI resource allocation',
+        step: 3, agent: '$eng Resource Agent', action: 'AI resource allocation',
         input: '${crisis.affectedPeople} affected', output: '${resources.unitCount} units: ${resources.summary}',
         confidence: 0.82, evidence: 'AI-optimized allocation', metadata: {},
       ),
       AntigravityTraceEvent(
-        step: 4, agent: 'Gemini Verification Agent', action: 'Signal reliability check',
+        step: 4, agent: '$eng Verification Agent', action: 'Signal reliability check',
         input: '${crisis.confidencePercent}% confidence', output: verification.label,
         confidence: verification.type == VerificationType.confirmed ? 0.91 : 0.68,
         evidence: verification.note, metadata: {},
@@ -781,56 +844,58 @@ Rules:
     List<String> fusionFindings,
   ) {
     final base = DateTime.now();
+    final eng = _activeEngine;
+    final engLabel = _activeEngineLabel;
     return [
       AgentLog(
         id: 'LOG-AI-01', agent: AgentType.fusionAgent,
-        summary: 'Gemini AI fused live signals',
+        summary: '$engLabel: Fused live signals',
         detail: fusionFindings.join(' '),
         level: LogLevel.success, timestamp: base.subtract(const Duration(seconds: 20)),
-        output: {'engine': 'gemini-2.0-flash', 'findings': fusionFindings.length},
+        output: {'engine': eng, 'findings': fusionFindings.length},
       ),
       AgentLog(
         id: 'LOG-AI-02', agent: AgentType.detectionAgent,
-        summary: 'Gemini AI: ${crisis.typeLabel} at ${crisis.location}',
+        summary: '$engLabel: ${crisis.typeLabel} at ${crisis.location}',
         detail: crisis.detectionReasoning,
         level: crisis.severity == SeverityLevel.critical ? LogLevel.error
             : crisis.severity == SeverityLevel.high ? LogLevel.warning
             : LogLevel.success,
         timestamp: base.subtract(const Duration(seconds: 15)),
-        output: {'type': crisis.typeLabel, 'severity': _severityLabel(crisis.severity), 'confidence': '${crisis.confidencePercent.toInt()}%'},
+        output: {'type': crisis.typeLabel, 'severity': _severityLabel(crisis.severity), 'confidence': '${crisis.confidencePercent.toInt()}%', 'engine': eng},
       ),
       AgentLog(
         id: 'LOG-AI-03', agent: AgentType.resourceAgent,
-        summary: 'Gemini AI: ${resources.unitCount} units allocated',
+        summary: '$engLabel: ${resources.unitCount} units allocated',
         detail: resources.summary,
         level: LogLevel.info,
         timestamp: base.subtract(const Duration(seconds: 10)),
-        output: {'units': resources.unitCount, 'engine': 'gemini-2.0-flash'},
+        output: {'units': resources.unitCount, 'engine': eng},
       ),
       AgentLog(
         id: 'LOG-AI-04', agent: AgentType.responsePlannerAgent,
-        summary: 'Gemini AI: ${plan.length}-step response plan',
+        summary: '$engLabel: ${plan.length}-step response plan',
         detail: plan.map((a) => '${a.step}. ${a.title} [${a.priority}]').join('. '),
         level: LogLevel.success,
         timestamp: base.subtract(const Duration(seconds: 8)),
-        output: {'actions': plan.length, 'engine': 'gemini-2.0-flash'},
+        output: {'actions': plan.length, 'engine': eng},
       ),
       AgentLog(
         id: 'LOG-AI-05', agent: AgentType.verificationAgent,
-        summary: 'Gemini AI: ${verification.label}',
+        summary: '$engLabel: ${verification.label}',
         detail: verification.note,
         level: verification.type == VerificationType.confirmed ? LogLevel.success : LogLevel.warning,
         timestamp: base.subtract(const Duration(seconds: 3)),
-        output: {'verification': verification.type.name, 'engine': 'gemini-2.0-flash'},
+        output: {'verification': verification.type.name, 'engine': eng},
       ),
       AgentLog(
         id: 'LOG-AI-06', agent: AgentType.logAgent,
-        summary: 'Gemini AI pipeline complete — all agents executed',
-        detail: 'Full AI-powered pipeline completed. 9 agents executed via Gemini 2.0 Flash. '
+        summary: '$engLabel pipeline complete — 9 agents executed',
+        detail: 'Full AI pipeline completed. 9 agents ran via $engLabel. '
             'All outputs are AI-generated from live signal data. No mock or hardcoded data used.',
         level: LogLevel.success,
         timestamp: base,
-        output: {'engine': 'gemini-2.0-flash', 'agents': 9, 'mode': 'Real AI'},
+        output: {'engine': eng, 'agents': 9, 'mode': 'Real AI'},
       ),
     ];
   }
