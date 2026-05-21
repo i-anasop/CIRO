@@ -1,6 +1,5 @@
-// CIRO — AI Agent Pipeline (Groq Primary / Gemini Fallback)
-// Runs the 9-agent crisis intelligence pipeline using Groq (Llama 3.3 70B) as primary.
-// Falls back to Gemini 2.0 Flash automatically if Groq is unavailable.
+// CIRO — AI Agent Pipeline
+// Runs the 9-agent crisis intelligence pipeline using Groq (Llama 3.3 70B).
 // All failures fall back gracefully to deterministic mode — never crashes.
 
 import 'package:flutter/foundation.dart';
@@ -12,31 +11,24 @@ import '../models/simulation_result.dart';
 import '../models/pipeline_result.dart';
 import '../models/orchestration_models.dart';
 import '../services/groq_service.dart';
-import '../services/gemini_service.dart';
 import '../services/app_config.dart';
 import '../services/real_signal_service.dart';
 
 /// Which AI engine is currently driving the pipeline.
 String get _activeEngine {
   if (AppConfig.instance.hasGroqKey) return 'groq-llama-3.3-70b';
-  if (AppConfig.instance.hasGeminiKey) return 'gemini-2.0-flash';
   return 'local-deterministic';
 }
 
 String get _activeEngineLabel {
   if (AppConfig.instance.hasGroqKey) return 'Groq (Llama 3.3)';
-  if (AppConfig.instance.hasGeminiKey) return 'Gemini 2.0 Flash';
   return 'Local Deterministic';
 }
 
-/// Unified AI call: tries Groq first, falls back to Gemini.
+/// Unified AI call through Groq. Local deterministic fallback handles failures.
 Future<Map<String, dynamic>?> _ai(String prompt) async {
   if (AppConfig.instance.hasGroqKey) {
-    final result = await GroqService.instance.generateJson(prompt);
-    if (result != null) return result;
-  }
-  if (AppConfig.instance.hasGeminiKey) {
-    return GeminiService.instance.generateJson(prompt);
+    return GroqService.instance.generateJson(prompt);
   }
   return null;
 }
@@ -44,8 +36,8 @@ Future<Map<String, dynamic>?> _ai(String prompt) async {
 /// Runs the full 9-agent pipeline using AI for Real Mode.
 /// Each agent produces its output from live signal data + AI reasoning.
 /// If AI fails for any agent, a sensible fallback is used.
-class GeminiAgentPipeline {
-  const GeminiAgentPipeline._();
+class AiAgentPipeline {
+  const AiAgentPipeline._();
 
   /// Run all agents and produce a complete PipelineResult.
   static Future<PipelineResult> run(RealSignalBundle bundle) async {
@@ -59,12 +51,18 @@ class GeminiAgentPipeline {
 
     // ── Agent 3: Crisis Detection ──────────────────────────────────────────
     final crisisResult = await _runDetectionAgent(
-      signalContext, location, bundle,
+      signalContext,
+      location,
+      bundle,
     );
     final crisis = crisisResult ?? _fallbackCrisis(bundle);
 
     // ── Agent 4: Evolution Forecast ────────────────────────────────────────
-    final evolution = await _runEvolutionAgent(crisis, weatherSummary, location);
+    final evolution = await _runEvolutionAgent(
+      crisis,
+      weatherSummary,
+      location,
+    );
 
     // ── Agent 5: Resource Allocation ───────────────────────────────────────
     final resources = await _runResourceAgent(crisis, location);
@@ -77,7 +75,9 @@ class GeminiAgentPipeline {
 
     // ── Agent 8: Verification ──────────────────────────────────────────────
     final verification = await _runVerificationAgent(
-      crisis, signalContext, bundle,
+      crisis,
+      signalContext,
+      bundle,
     );
 
     // ── Agent 9: Stakeholder Communications ────────────────────────────────
@@ -87,20 +87,26 @@ class GeminiAgentPipeline {
     final signalAssessments = _buildSignalAssessments(bundle, crisis);
 
     // ── Resource Decisions ─────────────────────────────────────────────────
-    final resourceDecisions = resources.units.asMap().entries.map((e) =>
-      ResourceDecision(
-        resource: e.value,
-        assignedTo: location,
-        priorityScore: (90 - e.key * 8).clamp(10, 100),
-        reason: 'AI-assigned for ${crisis.typeLabel} at $location.',
-        tradeOff: 'Balanced against standby capacity for secondary incidents.',
-      ),
-    ).toList();
+    final resourceDecisions = resources.units
+        .asMap()
+        .entries
+        .map(
+          (e) => ResourceDecision(
+            resource: e.value,
+            assignedTo: location,
+            priorityScore: (90 - e.key * 8).clamp(10, 100),
+            reason: 'AI-assigned for ${crisis.typeLabel} at $location.',
+            tradeOff:
+                'Balanced against standby capacity for secondary incidents.',
+          ),
+        )
+        .toList();
 
     // ── Coordination ───────────────────────────────────────────────────────
     final coordination = MultiCrisisCoordination(
       isActive: false,
-      summary: 'Single active incident. AI-optimized resource allocation for $location.',
+      summary:
+          'Single active incident. AI-optimized resource allocation for $location.',
       relatedIncidents: const [],
       tradeOffs: const [],
     );
@@ -119,7 +125,13 @@ class GeminiAgentPipeline {
     final trace = _buildTrace(crisis, resources, verification, fusionResult);
 
     // ── Agent Logs ─────────────────────────────────────────────────────────
-    final logs = _buildLogs(crisis, resources, plan, verification, fusionResult);
+    final logs = _buildLogs(
+      crisis,
+      resources,
+      plan,
+      verification,
+      fusionResult,
+    );
 
     return PipelineResult(
       scenario: scenario,
@@ -146,9 +158,11 @@ class GeminiAgentPipeline {
 
   /// Agent 1+2: Fusion — assess and fuse all signals.
   static Future<List<String>> _runFusionAgent(
-    String signalContext, String location,
+    String signalContext,
+    String location,
   ) async {
-    final prompt = '''You are a crisis signal fusion analyst for CIRO (Crisis Intelligence & Response Orchestrator).
+    final prompt =
+        '''You are a crisis signal fusion analyst for CIRO (Crisis Intelligence & Response Orchestrator).
 
 LOCATION: $location
 
@@ -184,9 +198,12 @@ Rules:
 
   /// Agent 3: Detection — classify crisis type, severity, confidence.
   static Future<Crisis?> _runDetectionAgent(
-    String signalContext, String location, RealSignalBundle bundle,
+    String signalContext,
+    String location,
+    RealSignalBundle bundle,
   ) async {
-    final prompt = '''You are a crisis detection AI for CIRO at $location.
+    final prompt =
+        '''You are a crisis detection AI for CIRO at $location.
 
 LIVE SIGNAL DATA:
 $signalContext
@@ -214,44 +231,59 @@ Rules:
     if (json == null) return null;
 
     try {
-      final type = _parseCrisisType(json['crisis_type'] as String? ?? 'road_blockage');
+      final type = _parseCrisisType(
+        json['crisis_type'] as String? ?? 'road_blockage',
+      );
       final severity = _parseSeverity(json['severity'] as String? ?? 'low');
       final detected = json['crisis_detected'] as bool? ?? false;
 
       return Crisis(
         id: 'CRS-REAL-AI',
         type: type,
-        title: json['title'] as String? ?? (detected
-            ? '${_typeLabel(type)} — $location'
-            : 'No Active Crisis Detected — $location'),
+        title:
+            json['title'] as String? ??
+            (detected
+                ? '${_typeLabel(type)} — $location'
+                : 'No Active Crisis Detected — $location'),
         location: location,
-        coordinates: '${bundle.location.latitude ?? 0},${bundle.location.longitude ?? 0}',
+        coordinates:
+            '${bundle.location.latitude ?? 0},${bundle.location.longitude ?? 0}',
         severity: severity,
         status: detected ? CrisisStatus.active : CrisisStatus.monitoring,
-        confidencePercent: (json['confidence_percent'] as num?)?.toDouble() ?? 65,
-        affectedPeople: (json['affected_people_estimate'] as num?)?.toInt() ?? 0,
+        confidencePercent:
+            (json['confidence_percent'] as num?)?.toDouble() ?? 65,
+        affectedPeople:
+            (json['affected_people_estimate'] as num?)?.toInt() ?? 0,
         detectedAt: DateTime.now(),
-        estimatedDuration: json['estimated_duration'] as String? ?? 'Monitoring',
+        estimatedDuration:
+            json['estimated_duration'] as String? ?? 'Monitoring',
         signalSummaries: [
-          if (bundle.weather?.isSuccess == true) 'Weather: ${bundle.weather!.rawSummary}',
-          if (bundle.newsSignals.isNotEmpty) 'News: ${bundle.newsSignals.length} article(s)',
-          if (bundle.traffic?.isSuccess == true) 'Traffic: ${bundle.traffic!.congestionLabel}',
+          if (bundle.weather?.isSuccess == true)
+            'Weather: ${bundle.weather!.rawSummary}',
+          if (bundle.newsSignals.isNotEmpty)
+            'News: ${bundle.newsSignals.length} article(s)',
+          if (bundle.traffic?.isSuccess == true)
+            'Traffic: ${bundle.traffic!.congestionLabel}',
         ],
-        detectionReasoning: json['detection_reasoning'] as String? ??
+        detectionReasoning:
+            json['detection_reasoning'] as String? ??
             'AI detection analysis completed for $location.',
         verificationState: detected ? 'AI Classified' : 'Monitoring',
       );
     } catch (e) {
-      debugPrint('[GeminiPipeline] Detection parse error: $e');
+      debugPrint('[AiPipeline] Detection parse error: $e');
       return null;
     }
   }
 
   /// Agent 4: Evolution — predict how the crisis will develop.
   static Future<CrisisEvolution> _runEvolutionAgent(
-    Crisis crisis, String weatherSummary, String location,
+    Crisis crisis,
+    String weatherSummary,
+    String location,
   ) async {
-    final prompt = '''You are a crisis evolution forecaster for CIRO.
+    final prompt =
+        '''You are a crisis evolution forecaster for CIRO.
 
 CRISIS: ${crisis.title} at $location
 SEVERITY: ${_severityLabel(crisis.severity)}
@@ -271,8 +303,13 @@ TASK: Predict crisis evolution. Return JSON:
     if (json != null) {
       return CrisisEvolution(
         affectedRadius: json['affected_radius'] as String? ?? '1 km',
-        affectedPopulation: (json['affected_population'] as num?)?.toInt() ?? crisis.affectedPeople,
-        expectedDuration: json['expected_duration'] as String? ?? crisis.estimatedDuration ?? 'Unknown',
+        affectedPopulation:
+            (json['affected_population'] as num?)?.toInt() ??
+            crisis.affectedPeople,
+        expectedDuration:
+            json['expected_duration'] as String? ??
+            crisis.estimatedDuration ??
+            'Unknown',
         peakImpactTime: json['peak_impact_time'] as String? ?? 'Unknown',
         spreadRisk: json['spread_risk'] as String? ?? 'Assessment unavailable',
         uncertaintyRange: json['uncertainty_range'] as String? ?? '+/- 25%',
@@ -290,9 +327,11 @@ TASK: Predict crisis evolution. Return JSON:
 
   /// Agent 5: Resource — recommend response units.
   static Future<ResourceAllocation> _runResourceAgent(
-    Crisis crisis, String location,
+    Crisis crisis,
+    String location,
   ) async {
-    final prompt = '''You are a disaster resource coordinator for CIRO.
+    final prompt =
+        '''You are a disaster resource coordinator for CIRO.
 
 CRISIS: ${crisis.title}
 LOCATION: $location
@@ -316,7 +355,9 @@ Rules:
       return ResourceAllocation(
         units: units,
         unitCount: units.length,
-        summary: json['summary'] as String? ?? 'AI-allocated resources for $location.',
+        summary:
+            json['summary'] as String? ??
+            'AI-allocated resources for $location.',
       );
     }
     return ResourceAllocation(
@@ -328,9 +369,12 @@ Rules:
 
   /// Agent 6: Response Plan — generate step-by-step actions.
   static Future<List<PlanAction>> _runResponsePlanAgent(
-    Crisis crisis, String location, ResourceAllocation resources,
+    Crisis crisis,
+    String location,
+    ResourceAllocation resources,
   ) async {
-    final prompt = '''You are an emergency response planner for CIRO.
+    final prompt =
+        '''You are an emergency response planner for CIRO.
 
 CRISIS: ${crisis.title}
 LOCATION: $location
@@ -376,14 +420,15 @@ Rules:
           );
         }).toList();
       } catch (e) {
-        debugPrint('[GeminiPipeline] Plan parse error: $e');
+        debugPrint('[AiPipeline] Plan parse error: $e');
       }
     }
     return [
       PlanAction(
         step: 1,
         title: 'Continue monitoring at $location',
-        description: 'AI response planning service temporarily unavailable. Manual assessment recommended.',
+        description:
+            'AI response planning service temporarily unavailable. Manual assessment recommended.',
         department: 'CIRO System',
         priority: 'P3',
         eta: 'Ongoing',
@@ -394,11 +439,14 @@ Rules:
 
   /// Agent 7: Simulation — project outcomes of the response plan.
   static Future<SimulationResult> _runSimulationAgent(
-    Crisis crisis, List<PlanAction> plan, String trafficSummary,
+    Crisis crisis,
+    List<PlanAction> plan,
+    String trafficSummary,
   ) async {
     final planSummary = plan.map((a) => '${a.step}. ${a.title}').join('\n');
 
-    final prompt = '''You are a crisis simulation engine for CIRO.
+    final prompt =
+        '''You are a crisis simulation engine for CIRO.
 
 CRISIS: ${crisis.title}
 SEVERITY: ${_severityLabel(crisis.severity)}
@@ -421,13 +469,17 @@ Rules:
 
     final json = await _ai(prompt);
 
-    final actions = plan.map((a) => SimulatedAction(
-      id: 'SIM-${a.step}',
-      title: a.title,
-      description: a.description,
-      status: a.status,
-      resultSummary: a.resultSummary,
-    )).toList();
+    final actions = plan
+        .map(
+          (a) => SimulatedAction(
+            id: 'SIM-${a.step}',
+            title: a.title,
+            description: a.description,
+            status: a.status,
+            resultSummary: a.resultSummary,
+          ),
+        )
+        .toList();
 
     List<MetricSnapshot> metrics = [];
     if (json != null && json['metrics'] is List) {
@@ -447,8 +499,20 @@ Rules:
 
     if (metrics.isEmpty) {
       metrics = [
-        const MetricSnapshot(label: 'Risk Level', before: 'Elevated', after: 'Reduced', delta: 'Improved', isImprovement: true),
-        const MetricSnapshot(label: 'Response Readiness', before: 'Standby', after: 'Active', delta: 'Improved', isImprovement: true),
+        const MetricSnapshot(
+          label: 'Risk Level',
+          before: 'Elevated',
+          after: 'Reduced',
+          delta: 'Improved',
+          isImprovement: true,
+        ),
+        const MetricSnapshot(
+          label: 'Response Readiness',
+          before: 'Standby',
+          after: 'Active',
+          delta: 'Improved',
+          isImprovement: true,
+        ),
       ];
     }
 
@@ -462,9 +526,12 @@ Rules:
 
   /// Agent 8: Verification — assess signal reliability.
   static Future<VerificationDecision> _runVerificationAgent(
-    Crisis crisis, String signalContext, RealSignalBundle bundle,
+    Crisis crisis,
+    String signalContext,
+    RealSignalBundle bundle,
   ) async {
-    final prompt = '''You are a verification analyst for CIRO.
+    final prompt =
+        '''You are a verification analyst for CIRO.
 
 CRISIS CLASSIFICATION: ${crisis.title}
 SEVERITY: ${_severityLabel(crisis.severity)}
@@ -490,23 +557,31 @@ Rules:
     final json = await _ai(prompt);
     if (json != null) {
       return VerificationDecision(
-        type: _parseVerificationType(json['verification_type'] as String? ?? 'needs_verification'),
+        type: _parseVerificationType(
+          json['verification_type'] as String? ?? 'needs_verification',
+        ),
         label: json['label'] as String? ?? 'AI verification completed',
-        note: json['note'] as String? ?? 'Verification assessment generated by Gemini AI.',
+        note:
+            json['note'] as String? ??
+            'Verification assessment generated by AI.',
       );
     }
     return VerificationDecision(
       type: VerificationType.needsVerification,
       label: 'AI verification unavailable',
-      note: 'Gemini verification agent could not be reached. Manual verification recommended.',
+      note:
+          'AI verification agent could not be reached. Manual verification recommended.',
     );
   }
 
   /// Agent 9: Stakeholder Communications.
   static Future<List<StakeholderNotification>> _runStakeholderAgent(
-    Crisis crisis, List<PlanAction> plan, String location,
+    Crisis crisis,
+    List<PlanAction> plan,
+    String location,
   ) async {
-    final prompt = '''You are a crisis communications officer for CIRO.
+    final prompt =
+        '''You are a crisis communications officer for CIRO.
 
 CRISIS: ${crisis.title}
 LOCATION: $location
@@ -537,7 +612,8 @@ Rules:
             stakeholder: d['stakeholder'] as String? ?? 'General',
             channel: d['channel'] as String? ?? 'Ops Console',
             urgency: d['urgency'] as String? ?? 'Priority',
-            message: d['message'] as String? ?? 'Advisory message from CIRO AI.',
+            message:
+                d['message'] as String? ?? 'Advisory message from CIRO AI.',
           );
         }).toList();
       } catch (_) {}
@@ -547,7 +623,8 @@ Rules:
         stakeholder: 'Command Center',
         channel: 'Ops Console',
         urgency: 'Priority',
-        message: 'CIRO AI analysis completed for $location. AI communications agent temporarily unavailable.',
+        message:
+            'CIRO AI analysis completed for $location. AI communications agent temporarily unavailable.',
       ),
     ];
   }
@@ -558,22 +635,30 @@ Rules:
 
   static String _buildSignalContext(RealSignalBundle bundle) {
     final parts = <String>[];
-    parts.add('LOCATION: ${bundle.location.displayLabel} (${bundle.location.latitude}, ${bundle.location.longitude})');
+    parts.add(
+      'LOCATION: ${bundle.location.displayLabel} (${bundle.location.latitude}, ${bundle.location.longitude})',
+    );
 
     if (bundle.weather?.isSuccess == true) {
       final w = bundle.weather!;
-      parts.add('WEATHER [OpenWeather API - LIVE]: ${w.condition} (${w.description}), '
-          'Temp: ${w.temperatureLabel}, Feels like: ${w.feelsLikeLabel}, '
-          'Humidity: ${w.humidity}%, Wind: ${w.windSpeed} m/s, '
-          'Rainfall: ${w.rainfallLabel}, Risk: ${w.alertLabel}');
+      parts.add(
+        'WEATHER [OpenWeather API - LIVE]: ${w.condition} (${w.description}), '
+        'Temp: ${w.temperatureLabel}, Feels like: ${w.feelsLikeLabel}, '
+        'Humidity: ${w.humidity}%, Wind: ${w.windSpeed} m/s, '
+        'Rainfall: ${w.rainfallLabel}, Risk: ${w.alertLabel}',
+      );
     } else {
       parts.add('WEATHER: Data unavailable');
     }
 
     if (bundle.newsSignals.isNotEmpty) {
-      parts.add('NEWS/PUBLIC FEED [NewsAPI - LIVE]: ${bundle.newsSignals.length} article(s):');
+      parts.add(
+        'NEWS/PUBLIC FEED [NewsAPI - LIVE]: ${bundle.newsSignals.length} article(s):',
+      );
       for (final n in bundle.newsSignals) {
-        parts.add('  - "${n.title}" (${n.source}, keyword: ${n.matchedKeyword})');
+        parts.add(
+          '  - "${n.title}" (${n.source}, keyword: ${n.matchedKeyword})',
+        );
       }
     } else {
       parts.add('NEWS/PUBLIC FEED: No crisis-relevant articles found');
@@ -581,9 +666,11 @@ Rules:
 
     if (bundle.traffic?.isSuccess == true) {
       final t = bundle.traffic!;
-      parts.add('TRAFFIC [Google Routes API - LIVE]: ${t.congestionLabel} congestion, '
-          'Normal: ${t.normalDurationMinutes}min, With traffic: ${t.trafficDurationMinutes}min, '
-          'Delay: ${t.delayMinutes}min');
+      parts.add(
+        'TRAFFIC [Google Routes API - LIVE]: ${t.congestionLabel} congestion, '
+        'Normal: ${t.normalDurationMinutes}min, With traffic: ${t.trafficDurationMinutes}min, '
+        'Delay: ${t.delayMinutes}min',
+      );
     } else {
       parts.add('TRAFFIC: Data unavailable');
     }
@@ -619,15 +706,19 @@ Rules:
       type: CrisisType.roadBlockage,
       title: 'Signal Analysis — $location',
       location: location,
-      coordinates: '${bundle.location.latitude ?? 0},${bundle.location.longitude ?? 0}',
+      coordinates:
+          '${bundle.location.latitude ?? 0},${bundle.location.longitude ?? 0}',
       severity: SeverityLevel.low,
       status: CrisisStatus.monitoring,
       confidencePercent: 55,
       affectedPeople: 0,
       detectedAt: DateTime.now(),
       estimatedDuration: 'Monitoring',
-      signalSummaries: ['AI detection unavailable — using signal summary mode.'],
-      detectionReasoning: 'Gemini AI classification service was unreachable. '
+      signalSummaries: [
+        'AI detection unavailable — using signal summary mode.',
+      ],
+      detectionReasoning:
+          'AI classification service was unreachable. '
           'Live signals collected but could not be analyzed by AI. '
           'Manual assessment recommended.',
       verificationState: 'AI Unavailable',
@@ -651,12 +742,15 @@ Rules:
     _ => SeverityLevel.low,
   };
 
-  static VerificationType _parseVerificationType(String s) => switch (s.toLowerCase()) {
-    'confirmed' => VerificationType.confirmed,
-    'conflicting_signals' || 'conflictingsignals' => VerificationType.conflictingSignals,
-    'false_positive_risk' || 'falsepositiverisk' => VerificationType.falsePositiveRisk,
-    _ => VerificationType.needsVerification,
-  };
+  static VerificationType _parseVerificationType(String s) =>
+      switch (s.toLowerCase()) {
+        'confirmed' => VerificationType.confirmed,
+        'conflicting_signals' ||
+        'conflictingsignals' => VerificationType.conflictingSignals,
+        'false_positive_risk' ||
+        'falsepositiverisk' => VerificationType.falsePositiveRisk,
+        _ => VerificationType.needsVerification,
+      };
 
   static String _typeLabel(CrisisType t) => switch (t) {
     CrisisType.urbanFlooding => 'Urban Flooding',
@@ -679,41 +773,52 @@ Rules:
   // ═══════════════════════════════════════════════════════════════════════════
 
   static List<SignalAssessment> _buildSignalAssessments(
-    RealSignalBundle bundle, Crisis crisis,
+    RealSignalBundle bundle,
+    Crisis crisis,
   ) {
     final assessments = <SignalAssessment>[];
     if (bundle.weather?.isSuccess == true) {
-      assessments.add(SignalAssessment(
-        source: SignalSource.weatherAlert,
-        sourceLabel: 'Weather (OpenWeather Live)',
-        credibility: 0.94,
-        geolocationConfidence: 0.92,
-        urgencyScore: bundle.weather!.isCrisisRelevant ? 0.85 : 0.40,
-        contradictionLevel: 0.08,
-        finding: 'Live weather: ${bundle.weather!.rawSummary}',
-      ));
+      assessments.add(
+        SignalAssessment(
+          source: SignalSource.weatherAlert,
+          sourceLabel: 'Weather (OpenWeather Live)',
+          credibility: 0.94,
+          geolocationConfidence: 0.92,
+          urgencyScore: bundle.weather!.isCrisisRelevant ? 0.85 : 0.40,
+          contradictionLevel: 0.08,
+          finding: 'Live weather: ${bundle.weather!.rawSummary}',
+        ),
+      );
     }
     if (bundle.newsSignals.isNotEmpty) {
-      assessments.add(SignalAssessment(
-        source: SignalSource.socialPost,
-        sourceLabel: 'News/Public Feed (NewsAPI Live)',
-        credibility: 0.78,
-        geolocationConfidence: 0.70,
-        urgencyScore: bundle.newsSignals.any((n) => n.confidenceHint > 0.7) ? 0.80 : 0.55,
-        contradictionLevel: 0.15,
-        finding: '${bundle.newsSignals.length} live article(s). Top: "${bundle.newsSignals.first.title}"',
-      ));
+      assessments.add(
+        SignalAssessment(
+          source: SignalSource.socialPost,
+          sourceLabel: 'News/Public Feed (NewsAPI Live)',
+          credibility: 0.78,
+          geolocationConfidence: 0.70,
+          urgencyScore: bundle.newsSignals.any((n) => n.confidenceHint > 0.7)
+              ? 0.80
+              : 0.55,
+          contradictionLevel: 0.15,
+          finding:
+              '${bundle.newsSignals.length} live article(s). Top: "${bundle.newsSignals.first.title}"',
+        ),
+      );
     }
     if (bundle.traffic?.isSuccess == true) {
-      assessments.add(SignalAssessment(
-        source: SignalSource.trafficData,
-        sourceLabel: 'Traffic (Google Routes Live)',
-        credibility: 0.90,
-        geolocationConfidence: 0.95,
-        urgencyScore: bundle.traffic!.delayRatio > 1.3 ? 0.78 : 0.40,
-        contradictionLevel: 0.05,
-        finding: 'Live traffic: ${bundle.traffic!.congestionLabel}, delay ${bundle.traffic!.delayMinutes}min.',
-      ));
+      assessments.add(
+        SignalAssessment(
+          source: SignalSource.trafficData,
+          sourceLabel: 'Traffic (Google Routes Live)',
+          credibility: 0.90,
+          geolocationConfidence: 0.95,
+          urgencyScore: bundle.traffic!.delayRatio > 1.3 ? 0.78 : 0.40,
+          contradictionLevel: 0.05,
+          finding:
+              'Live traffic: ${bundle.traffic!.congestionLabel}, delay ${bundle.traffic!.delayMinutes}min.',
+        ),
+      );
     }
     return assessments;
   }
@@ -765,14 +870,21 @@ Rules:
       ),
       extraSignals: const [],
       responseActions: plan,
-      simulationMetrics: simulation.metrics.map((m) => MetricPair(
-        label: m.label,
-        before: m.before,
-        after: m.after,
-        delta: m.delta,
-        isImprovement: m.isImprovement,
-      )).toList(),
-      possibleSideEffects: _sideEffects(crisis.type, crisis.status == CrisisStatus.active),
+      simulationMetrics: simulation.metrics
+          .map(
+            (m) => MetricPair(
+              label: m.label,
+              before: m.before,
+              after: m.after,
+              delta: m.delta,
+              isImprovement: m.isImprovement,
+            ),
+          )
+          .toList(),
+      possibleSideEffects: _sideEffects(
+        crisis.type,
+        crisis.status == CrisisStatus.active,
+      ),
       verificationType: verification.type,
       verificationNote: verification.note,
       mapZoneLabel: location,
@@ -792,15 +904,23 @@ Rules:
     if (!active) return const [];
     switch (type) {
       case CrisisType.urbanFlooding:
-        return const ['Alternate routes may see temporary congestion increases.'];
+        return const [
+          'Alternate routes may see temporary congestion increases.',
+        ];
       case CrisisType.heatwave:
-        return const ['Clinic surge prep may reduce non-urgent outpatient capacity.'];
+        return const [
+          'Clinic surge prep may reduce non-urgent outpatient capacity.',
+        ];
       case CrisisType.accident:
         return const ['Rerouting may slow adjacent arterial roads.'];
       case CrisisType.powerOutage:
-        return const ['Generator prioritization may leave lower-risk sites waiting.'];
+        return const [
+          'Generator prioritization may leave lower-risk sites waiting.',
+        ];
       case CrisisType.roadBlockage:
-        return const ['Manual traffic control may delay public transport schedules.'];
+        return const [
+          'Manual traffic control may delay public transport schedules.',
+        ];
     }
   }
 
@@ -813,25 +933,46 @@ Rules:
     final eng = _activeEngineLabel;
     return [
       AntigravityTraceEvent(
-        step: 1, agent: '$eng Fusion Agent', action: 'Fuse multi-source live signals',
-        input: 'Weather + News + Traffic', output: fusionFindings.join(' '),
-        confidence: 0.88, evidence: 'AI-analyzed signal fusion', metadata: {},
+        step: 1,
+        agent: '$eng Fusion Agent',
+        action: 'Fuse multi-source live signals',
+        input: 'Weather + News + Traffic',
+        output: fusionFindings.join(' '),
+        confidence: 0.88,
+        evidence: 'AI-analyzed signal fusion',
+        metadata: {},
       ),
       AntigravityTraceEvent(
-        step: 2, agent: '$eng Detection Agent', action: 'Classify crisis from fused signals',
-        input: crisis.location, output: '${crisis.typeLabel} — ${_severityLabel(crisis.severity)}',
-        confidence: crisis.confidencePercent / 100, evidence: crisis.detectionReasoning, metadata: {},
+        step: 2,
+        agent: '$eng Detection Agent',
+        action: 'Classify crisis from fused signals',
+        input: crisis.location,
+        output: '${crisis.typeLabel} — ${_severityLabel(crisis.severity)}',
+        confidence: crisis.confidencePercent / 100,
+        evidence: crisis.detectionReasoning,
+        metadata: {},
       ),
       AntigravityTraceEvent(
-        step: 3, agent: '$eng Resource Agent', action: 'AI resource allocation',
-        input: '${crisis.affectedPeople} affected', output: '${resources.unitCount} units: ${resources.summary}',
-        confidence: 0.82, evidence: 'AI-optimized allocation', metadata: {},
+        step: 3,
+        agent: '$eng Resource Agent',
+        action: 'AI resource allocation',
+        input: '${crisis.affectedPeople} affected',
+        output: '${resources.unitCount} units: ${resources.summary}',
+        confidence: 0.82,
+        evidence: 'AI-optimized allocation',
+        metadata: {},
       ),
       AntigravityTraceEvent(
-        step: 4, agent: '$eng Verification Agent', action: 'Signal reliability check',
-        input: '${crisis.confidencePercent}% confidence', output: verification.label,
-        confidence: verification.type == VerificationType.confirmed ? 0.91 : 0.68,
-        evidence: verification.note, metadata: {},
+        step: 4,
+        agent: '$eng Verification Agent',
+        action: 'Signal reliability check',
+        input: '${crisis.confidencePercent}% confidence',
+        output: verification.label,
+        confidence: verification.type == VerificationType.confirmed
+            ? 0.91
+            : 0.68,
+        evidence: verification.note,
+        metadata: {},
       ),
     ];
   }
@@ -848,24 +989,35 @@ Rules:
     final engLabel = _activeEngineLabel;
     return [
       AgentLog(
-        id: 'LOG-AI-01', agent: AgentType.fusionAgent,
+        id: 'LOG-AI-01',
+        agent: AgentType.fusionAgent,
         summary: '$engLabel: Fused live signals',
         detail: fusionFindings.join(' '),
-        level: LogLevel.success, timestamp: base.subtract(const Duration(seconds: 20)),
+        level: LogLevel.success,
+        timestamp: base.subtract(const Duration(seconds: 20)),
         output: {'engine': eng, 'findings': fusionFindings.length},
       ),
       AgentLog(
-        id: 'LOG-AI-02', agent: AgentType.detectionAgent,
+        id: 'LOG-AI-02',
+        agent: AgentType.detectionAgent,
         summary: '$engLabel: ${crisis.typeLabel} at ${crisis.location}',
         detail: crisis.detectionReasoning,
-        level: crisis.severity == SeverityLevel.critical ? LogLevel.error
-            : crisis.severity == SeverityLevel.high ? LogLevel.warning
+        level: crisis.severity == SeverityLevel.critical
+            ? LogLevel.error
+            : crisis.severity == SeverityLevel.high
+            ? LogLevel.warning
             : LogLevel.success,
         timestamp: base.subtract(const Duration(seconds: 15)),
-        output: {'type': crisis.typeLabel, 'severity': _severityLabel(crisis.severity), 'confidence': '${crisis.confidencePercent.toInt()}%', 'engine': eng},
+        output: {
+          'type': crisis.typeLabel,
+          'severity': _severityLabel(crisis.severity),
+          'confidence': '${crisis.confidencePercent.toInt()}%',
+          'engine': eng,
+        },
       ),
       AgentLog(
-        id: 'LOG-AI-03', agent: AgentType.resourceAgent,
+        id: 'LOG-AI-03',
+        agent: AgentType.resourceAgent,
         summary: '$engLabel: ${resources.unitCount} units allocated',
         detail: resources.summary,
         level: LogLevel.info,
@@ -873,25 +1025,33 @@ Rules:
         output: {'units': resources.unitCount, 'engine': eng},
       ),
       AgentLog(
-        id: 'LOG-AI-04', agent: AgentType.responsePlannerAgent,
+        id: 'LOG-AI-04',
+        agent: AgentType.responsePlannerAgent,
         summary: '$engLabel: ${plan.length}-step response plan',
-        detail: plan.map((a) => '${a.step}. ${a.title} [${a.priority}]').join('. '),
+        detail: plan
+            .map((a) => '${a.step}. ${a.title} [${a.priority}]')
+            .join('. '),
         level: LogLevel.success,
         timestamp: base.subtract(const Duration(seconds: 8)),
         output: {'actions': plan.length, 'engine': eng},
       ),
       AgentLog(
-        id: 'LOG-AI-05', agent: AgentType.verificationAgent,
+        id: 'LOG-AI-05',
+        agent: AgentType.verificationAgent,
         summary: '$engLabel: ${verification.label}',
         detail: verification.note,
-        level: verification.type == VerificationType.confirmed ? LogLevel.success : LogLevel.warning,
+        level: verification.type == VerificationType.confirmed
+            ? LogLevel.success
+            : LogLevel.warning,
         timestamp: base.subtract(const Duration(seconds: 3)),
         output: {'verification': verification.type.name, 'engine': eng},
       ),
       AgentLog(
-        id: 'LOG-AI-06', agent: AgentType.logAgent,
+        id: 'LOG-AI-06',
+        agent: AgentType.logAgent,
         summary: '$engLabel pipeline complete — 9 agents executed',
-        detail: 'Full AI pipeline completed. 9 agents ran via $engLabel. '
+        detail:
+            'Full AI pipeline completed. 9 agents ran via $engLabel. '
             'All outputs are AI-generated from live signal data. No mock or hardcoded data used.',
         level: LogLevel.success,
         timestamp: base,

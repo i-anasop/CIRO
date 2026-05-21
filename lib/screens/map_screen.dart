@@ -19,7 +19,6 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   String _layer = 'All Layers';
-  final int _zoom = 15;
   final bool _showRisk = false;
   final bool _showRoute = false;
   final int _recenterSignal = 0;
@@ -49,6 +48,9 @@ class _MapScreenState extends State<MapScreen> {
         final crisis = engine.activeCrisis;
         final isDemo = AppModeService.instance.isDemoMode;
         final coords = isDemo ? const (33.6946, 73.0179) : _coords(crisis);
+        final mapView = isDemo
+            ? const _MapView(33.6946, 73.0179, 15)
+            : _cityWideView(crisis, coords);
 
         return Scaffold(
           backgroundColor: CiroColors.bg1,
@@ -78,28 +80,31 @@ class _MapScreenState extends State<MapScreen> {
                                 children: [
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           isDemo
                                               ? 'Google Map - G-10, Islamabad'
                                               : 'Google Live Situation Map',
-                                          style: CiroTypography.labelLarge.copyWith(
-                                            fontSize: 13.5,
-                                            fontWeight: FontWeight.w900,
-                                            color: const Color(0xFF1E293B),
-                                          ),
+                                          style: CiroTypography.labelLarge
+                                              .copyWith(
+                                                fontSize: 13.5,
+                                                fontWeight: FontWeight.w900,
+                                                color: const Color(0xFF1E293B),
+                                              ),
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
                                           crisis.location,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: CiroTypography.bodySmall.copyWith(
-                                            fontSize: 11,
-                                            color: const Color(0xFF94A3B8),
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                          style: CiroTypography.bodySmall
+                                              .copyWith(
+                                                fontSize: 11,
+                                                color: const Color(0xFF94A3B8),
+                                                fontWeight: FontWeight.w600,
+                                              ),
                                         ),
                                       ],
                                     ),
@@ -137,7 +142,9 @@ class _MapScreenState extends State<MapScreen> {
                       child: createInteractiveMap(
                         latitude: coords.$1,
                         longitude: coords.$2,
-                        zoom: _zoom,
+                        mapCenterLatitude: mapView.latitude,
+                        mapCenterLongitude: mapView.longitude,
+                        zoom: mapView.zoom,
                         selectedLayer: _layer,
                         showRiskZone: _showRisk,
                         showAltRoute: _showRoute,
@@ -157,8 +164,28 @@ class _MapScreenState extends State<MapScreen> {
       },
     );
   }
+}
 
+class _MapView {
+  final double latitude;
+  final double longitude;
+  final int zoom;
 
+  const _MapView(this.latitude, this.longitude, this.zoom);
+}
+
+_MapView _cityWideView(Crisis crisis, (double, double) marker) {
+  final location = crisis.location.toLowerCase();
+  final inIslamabad =
+      location.contains('islamabad') ||
+      (marker.$1 >= 33.55 &&
+          marker.$1 <= 33.85 &&
+          marker.$2 >= 72.80 &&
+          marker.$2 <= 73.25);
+  if (inIslamabad) {
+    return const _MapView(33.6844, 73.0479, 11);
+  }
+  return _MapView(marker.$1, marker.$2, 13);
 }
 
 class _MapSummaryPanel extends StatelessWidget {
@@ -209,7 +236,9 @@ class _MapSummaryPanel extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isDemo ? 'Urban Flooding — G-10, Islamabad' : crisis.title,
+                      isDemo
+                          ? 'Urban Flooding — G-10, Islamabad'
+                          : crisis.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: CiroTypography.labelLarge.copyWith(
@@ -255,11 +284,7 @@ class _MapSummaryPanel extends StatelessWidget {
             ],
           ),
           if (actions.isNotEmpty) ...[
-            const Divider(
-              color: Color(0xFFF1F5F9),
-              thickness: 1.0,
-              height: 28,
-            ),
+            const Divider(color: Color(0xFFF1F5F9), thickness: 1.0, height: 28),
             ...actions.map(
               (a) => Padding(
                 padding: const EdgeInsets.only(bottom: 10.0),
@@ -269,7 +294,9 @@ class _MapSummaryPanel extends StatelessWidget {
                       width: 26,
                       height: 26,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFEEF2FF), // Very soft lavender/blue
+                        color: const Color(
+                          0xFFEEF2FF,
+                        ), // Very soft lavender/blue
                         borderRadius: BorderRadius.circular(8),
                       ),
                       alignment: Alignment.center,
@@ -402,11 +429,7 @@ class _RoundButton extends StatelessWidget {
             ),
           ],
         ),
-        child: Icon(
-          icon,
-          color: const Color(0xFF1E293B),
-          size: 20,
-        ),
+        child: Icon(icon, color: const Color(0xFF1E293B), size: 20),
       ),
     );
     if (tooltip != null) return Tooltip(message: tooltip!, child: child);

@@ -54,7 +54,7 @@ Future<LocationResult> getCurrentLocationPlatform() async {
   );
 
   return completer.future.timeout(
-    const Duration(milliseconds: 3500),
+    const Duration(milliseconds: 2000),
     onTimeout: () => const LocationResult(
       latitude:     33.6428,
       longitude:    72.9730,
@@ -64,7 +64,7 @@ Future<LocationResult> getCurrentLocationPlatform() async {
       country:      'Pakistan',
       isMock:       true,
       isSuccess:    true,
-      errorMessage: 'Location request timed out after 3.5s.',
+      errorMessage: 'Location request timed out after 2.0s.',
     ),
   );
 }

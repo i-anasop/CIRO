@@ -221,12 +221,17 @@ class _NotificationCard extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isRead
+                ? const Color(0xFFE5E7EB)
+                : props.color.withValues(alpha: 0.18),
+          ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF101828).withValues(alpha: 0.025),
-              blurRadius: 12,
-              offset: const Offset(0, 5),
+              color: const Color(0xFF101828).withValues(alpha: 0.045),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
@@ -234,13 +239,14 @@ class _NotificationCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 48,
-              height: 48,
+              width: 50,
+              height: 50,
               decoration: BoxDecoration(
                 color: props.bg,
-                shape: BoxShape.circle,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: props.color.withValues(alpha: 0.16)),
               ),
-              child: Icon(props.icon, color: props.color, size: 24),
+              child: Icon(props.icon, color: props.color, size: 23),
             ),
             const SizedBox(width: 13),
             Expanded(
@@ -282,13 +288,39 @@ class _NotificationCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        _friendlyTime(item['time']),
-                        style: const TextStyle(
-                          color: Color(0xFF667085),
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            _friendlyTime(item['time']),
+                            style: const TextStyle(
+                              color: Color(0xFF667085),
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          if (!isRead) ...[
+                            const SizedBox(height: 5),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: props.color.withValues(alpha: 0.09),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                'New',
+                                style: TextStyle(
+                                  color: props.color,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),
@@ -365,30 +397,63 @@ class _NotificationProps {
 
 _NotificationProps _props(String title) {
   final t = title.toLowerCase();
-  if (t.contains('rain') || t.contains('flood') || t.contains('critical')) {
+  if (t.contains('welcome')) {
     return const _NotificationProps(
-      icon: Icons.water_drop_outlined,
-      color: Color(0xFF2563EB),
-      bg: Color(0xFFEFF6FF),
-    );
-  }
-  if (t.contains('traffic') || t.contains('congestion') || t.contains('high')) {
-    return const _NotificationProps(
-      icon: Icons.flag_outlined,
+      icon: Icons.waving_hand_rounded,
       color: Color(0xFF5A5CE5),
       bg: Color(0xFFF0EFFE),
     );
   }
-  if (t.contains('payment') || t.contains('required')) {
+  if (t.contains('profile')) {
     return const _NotificationProps(
-      icon: Icons.credit_card_rounded,
+      icon: Icons.account_circle_rounded,
       color: Color(0xFF2563EB),
       bg: Color(0xFFEFF6FF),
     );
   }
-  if (t.contains('otp') || t.contains('verification')) {
+  if (t.contains('safety') || t.contains('guidance')) {
     return const _NotificationProps(
-      icon: Icons.lock_outline_rounded,
+      icon: Icons.health_and_safety_rounded,
+      color: Color(0xFF059669),
+      bg: Color(0xFFECFDF5),
+    );
+  }
+  if (t.contains('heat')) {
+    return const _NotificationProps(
+      icon: Icons.thermostat_rounded,
+      color: Color(0xFFDC2626),
+      bg: Color(0xFFFFF1F2),
+    );
+  }
+  if (t.contains('rain') || t.contains('flood') || t.contains('critical')) {
+    return const _NotificationProps(
+      icon: Icons.flood_rounded,
+      color: Color(0xFF2563EB),
+      bg: Color(0xFFEFF6FF),
+    );
+  }
+  if (t.contains('traffic') ||
+      t.contains('congestion') ||
+      t.contains('blockage') ||
+      t.contains('route')) {
+    return const _NotificationProps(
+      icon: Icons.traffic_rounded,
+      color: Color(0xFF5A5CE5),
+      bg: Color(0xFFF0EFFE),
+    );
+  }
+  if (t.contains('verified') ||
+      t.contains('confirmed') ||
+      t.contains('verification')) {
+    return const _NotificationProps(
+      icon: Icons.verified_rounded,
+      color: Color(0xFF059669),
+      bg: Color(0xFFECFDF5),
+    );
+  }
+  if (t.contains('demo') || t.contains('location')) {
+    return const _NotificationProps(
+      icon: Icons.map_rounded,
       color: Color(0xFF5A5CE5),
       bg: Color(0xFFF0EFFE),
     );
@@ -402,8 +467,14 @@ _NotificationProps _props(String title) {
 
 String _friendlyTitle(String title) {
   final t = title.toLowerCase();
+  if (t.contains('welcome')) return 'Welcome to CIRO';
+  if (t.contains('profile')) return 'Complete Your Profile';
+  if (t.contains('safety')) return 'Safety Tips Ready';
+  if (t.contains('heat')) return 'Heat Risk Alert';
   if (t.contains('rain')) return 'Flood Watch Ready';
   if (t.contains('traffic')) return 'Route Marked as High Priority';
+  if (t.contains('verified incident')) return 'Incident Verified';
+  if (t.contains('confirmed')) return 'Crisis Verified';
   if (t.contains('urban flooding')) return 'Incident Verified';
   if (t.contains('real mode')) return 'Live Monitoring Started';
   if (t.contains('demo mode')) return 'Demo Location Active';
@@ -416,7 +487,6 @@ String _friendlyDetails(String details) {
       .replaceAll('Weather Agent', 'Weather check')
       .replaceAll('Traffic Agent', 'Traffic check')
       .replaceAll('Social Post corroboration', 'Citizen report match')
-      .replaceAll('CIRO', 'Ciro')
       .trim();
 }
 
@@ -431,16 +501,9 @@ String _friendlyTime(String time) {
 final List<Map<String, dynamic>> _demoYesterdayNotifications = [
   {
     'id': 'y1',
-    'title': 'Welcome to CIRO',
-    'details': 'Start by choosing demo G-10 or live location monitoring.',
-    'time': '1 day ago',
-    'isRead': true,
-  },
-  {
-    'id': 'y2',
-    'title': 'OTP Verification Successful',
+    'title': 'Safety Tips Ready',
     'details':
-        'Your account has been successfully verified. You can now access the platform.',
+        'Flood, heat, traffic, outage, and accident guidance is available from Quick Actions.',
     'time': '1 day ago',
     'isRead': true,
   },

@@ -105,7 +105,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     try {
       final googleSignIn = GoogleSignIn(
         clientId: clientId,
-        scopes: const ['email'],
+        scopes: const ['email', 'profile'],
       );
 
       final user = await googleSignIn.signIn();
@@ -122,13 +122,15 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         _loadingMessage = 'Importing Google Profile...';
       });
 
+      final googleAvatarUrl = user.photoUrl ?? googleSignIn.currentUser?.photoUrl;
+
       // Update User Profile Service with google profile info
       await UserProfileService.instance.updateProfile(
         name: user.displayName ?? user.email.split('@').first,
         role: 'Crisis Field Responder',
         email: user.email,
         avatarIndex: 0,
-        customAvatarUrl: user.photoUrl,
+        customAvatarUrl: googleAvatarUrl,
       );
 
       setState(() {

@@ -1,7 +1,7 @@
 // CIRO — Groq AI Service
 // Uses Groq's OpenAI-compatible REST API.
 // Model: llama-3.3-70b-versatile (free tier: 14,400 req/day, 30 req/min)
-// 10x faster than Gemini, extremely generous free quota.
+// Fast cloud AI path with generous free quota.
 // Zero extra dependencies — uses dart:convert + http (already in project).
 // Never throws — all failures return null and callers handle gracefully.
 
@@ -73,9 +73,9 @@ class GroqService {
       }
 
       final data = jsonDecode(resp.body) as Map<String, dynamic>;
-      final content = (data['choices'] as List?)
-          ?.firstOrNull
-          ?['message']?['content'] as String?;
+      final content =
+          (data['choices'] as List?)?.firstOrNull?['message']?['content']
+              as String?;
 
       if (content == null || content.isEmpty) {
         _lastCallSucceeded = false;
@@ -128,9 +128,9 @@ class GroqService {
       }
 
       final data = jsonDecode(resp.body) as Map<String, dynamic>;
-      final content = (data['choices'] as List?)
-          ?.firstOrNull
-          ?['message']?['content'] as String?;
+      final content =
+          (data['choices'] as List?)?.firstOrNull?['message']?['content']
+              as String?;
 
       _lastCallSucceeded = content != null;
       return content;
@@ -146,9 +146,14 @@ class GroqService {
   /// Strip markdown code fences if the model wraps JSON anyway.
   String _stripFences(String s) {
     String c = s.trim();
-    if (c.startsWith('```json')) c = c.substring(7);
-    else if (c.startsWith('```')) c = c.substring(3);
-    if (c.endsWith('```')) c = c.substring(0, c.length - 3);
+    if (c.startsWith('```json')) {
+      c = c.substring(7);
+    } else if (c.startsWith('```')) {
+      c = c.substring(3);
+    }
+    if (c.endsWith('```')) {
+      c = c.substring(0, c.length - 3);
+    }
     return c.trim();
   }
 }

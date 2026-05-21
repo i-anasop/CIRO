@@ -2,6 +2,7 @@
 // Optimized starting screen matching the high-fidelity mockup.
 // Simplified, fitted, and structured to fit perfectly on a single screen without scrolling.
 
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -10,9 +11,11 @@ import '../services/location_service.dart';
 import '../services/geocoding_service.dart';
 import '../services/scenario_engine.dart';
 import '../services/app_mode_service.dart';
+import '../services/notification_service.dart';
 import '../models/location_result.dart';
 
 enum SelectionMode { live, demo }
+
 enum LocationState { initial, scanning, success, error }
 
 class LocationScreen extends StatefulWidget {
@@ -47,6 +50,8 @@ class _LocationScreenState extends State<LocationScreen>
 
   Future<void> _requestLocationAccess() async {
     AppModeService.instance.setDemoMode(false);
+    ScenarioEngine.instance.setInjectedRealCrisisType(null);
+    unawaited(NotificationService.instance.requestPermissions());
     setState(() => _state = LocationState.scanning);
 
     final locResult = await LocationService.instance.getCurrentLocation();
@@ -55,6 +60,22 @@ class _LocationScreenState extends State<LocationScreen>
       return;
     }
 
+    ScenarioEngine.instance.overrideLocation(
+      'Live Location',
+      lat: locResult.latitude,
+      lng: locResult.longitude,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _detectedLocation = locResult;
+      _state = LocationState.success;
+    });
+
+    unawaited(_finalizeLiveLocation(locResult));
+  }
+
+  Future<void> _finalizeLiveLocation(LocationResult locResult) async {
     final geocoded = await GeocodingService.instance.reverseGeocode(locResult);
     if (!mounted) return;
 
@@ -65,20 +86,21 @@ class _LocationScreenState extends State<LocationScreen>
     );
 
     if (!AppModeService.instance.isDemoMode) {
-      try {
-        await ScenarioEngine.instance.runRealSignalAnalysis(
-          latitude: geocoded.latitude,
-          longitude: geocoded.longitude,
-        );
-      } catch (e) {
-        debugPrint('Failed to run live real signal analysis: $e');
-      }
+      unawaited(() async {
+        try {
+          await ScenarioEngine.instance.runRealSignalAnalysis(
+            latitude: geocoded.latitude,
+            longitude: geocoded.longitude,
+          );
+        } catch (e) {
+          debugPrint('Failed to run live real signal analysis: $e');
+        }
+      }());
     }
 
     if (!mounted) return;
     setState(() {
       _detectedLocation = geocoded;
-      _state = LocationState.success;
     });
   }
 
@@ -140,9 +162,12 @@ class _LocationScreenState extends State<LocationScreen>
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final bool useScroll = constraints.maxHeight < 620;
-                
+
                 final content = Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 20,
+                  ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -159,7 +184,8 @@ class _LocationScreenState extends State<LocationScreen>
                               AnimatedBuilder(
                                 animation: _pulseCtrl,
                                 builder: (context, child) {
-                                  final glowScaleVal = 0.88 + (_pulseCtrl.value * 0.22);
+                                  final glowScaleVal =
+                                      0.88 + (_pulseCtrl.value * 0.22);
                                   return Transform.scale(
                                     scale: glowScaleVal,
                                     child: Container(
@@ -169,8 +195,12 @@ class _LocationScreenState extends State<LocationScreen>
                                         shape: BoxShape.circle,
                                         gradient: RadialGradient(
                                           colors: [
-                                            const Color(0xFF4F46E5).withValues(alpha: 0.20),
-                                            const Color(0xFF4F46E5).withValues(alpha: 0.0),
+                                            const Color(
+                                              0xFF4F46E5,
+                                            ).withValues(alpha: 0.20),
+                                            const Color(
+                                              0xFF4F46E5,
+                                            ).withValues(alpha: 0.0),
                                           ],
                                         ),
                                       ),
@@ -190,7 +220,9 @@ class _LocationScreenState extends State<LocationScreen>
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFF4F46E5).withValues(alpha: 0.12),
+                                      color: const Color(
+                                        0xFF4F46E5,
+                                      ).withValues(alpha: 0.12),
                                       blurRadius: 24,
                                       spreadRadius: 2,
                                     ),
@@ -283,7 +315,9 @@ class _LocationScreenState extends State<LocationScreen>
                                 ? 'Connected to GPS! Location resolved.'
                                 : 'Use your GPS for real-time weather, traffic, and nearby crisis signals.',
                             icon: Icons.track_changes_rounded,
-                            accentColor: isSuccess ? const Color(0xFF10B981) : const Color(0xFF0EA5E9),
+                            accentColor: isSuccess
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFF0EA5E9),
                             badgeText: isScanning ? null : 'GPS READY',
                             isLoading: isScanning,
                           ),
@@ -299,7 +333,8 @@ class _LocationScreenState extends State<LocationScreen>
                           _buildOptionCard(
                             mode: SelectionMode.demo,
                             title: 'Islamabad G-10 (Demo)',
-                            subtitle: 'Guided walkthrough with preloaded signals and sample data.',
+                            subtitle:
+                                'Guided walkthrough with preloaded signals and sample data.',
                             icon: Icons.map_rounded,
                             accentColor: const Color(0xFF8B5CF6),
                             badgeText: 'FOR TESTING',
@@ -324,7 +359,9 @@ class _LocationScreenState extends State<LocationScreen>
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFF4F46E5).withValues(alpha: 0.2),
+                                  color: const Color(
+                                    0xFF4F46E5,
+                                  ).withValues(alpha: 0.2),
                                   blurRadius: 12,
                                   offset: const Offset(0, 3),
                                 ),
@@ -345,11 +382,15 @@ class _LocationScreenState extends State<LocationScreen>
                                       height: 20,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2.0,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
                                       ),
                                     )
                                   : Text(
-                                      isSuccess && _selection == SelectionMode.live
+                                      isSuccess &&
+                                              _selection == SelectionMode.live
                                           ? 'Enter Command Center'
                                           : 'Continue',
                                       style: GoogleFonts.inter(
@@ -391,7 +432,9 @@ class _LocationScreenState extends State<LocationScreen>
                   return SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
                     child: ConstrainedBox(
-                      constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
                       child: content,
                     ),
                   );
@@ -431,7 +474,9 @@ class _LocationScreenState extends State<LocationScreen>
           border: Border.all(
             color: isSelected
                 ? const Color(0xFF4F46E5)
-                : (_hoveredMode == mode ? const Color(0xFFCBD5E1) : const Color(0xFFE2E8F0)),
+                : (_hoveredMode == mode
+                      ? const Color(0xFFCBD5E1)
+                      : const Color(0xFFE2E8F0)),
             width: isSelected ? 2.0 : 1.0,
           ),
           boxShadow: [
@@ -439,8 +484,8 @@ class _LocationScreenState extends State<LocationScreen>
               color: isSelected
                   ? const Color(0xFF4F46E5).withValues(alpha: 0.05)
                   : (_hoveredMode == mode
-                      ? Colors.black.withValues(alpha: 0.02)
-                      : Colors.black.withValues(alpha: 0.01)),
+                        ? Colors.black.withValues(alpha: 0.02)
+                        : Colors.black.withValues(alpha: 0.01)),
               blurRadius: isSelected ? 12 : 8,
               offset: const Offset(0, 4),
             ),
@@ -454,7 +499,8 @@ class _LocationScreenState extends State<LocationScreen>
               setState(() {
                 _selection = mode;
               });
-              if (mode == SelectionMode.live && _state == LocationState.initial) {
+              if (mode == SelectionMode.live &&
+                  _state == LocationState.initial) {
                 _requestLocationAccess();
               }
             },
@@ -518,7 +564,10 @@ class _LocationScreenState extends State<LocationScreen>
                                         height: 8,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 1.5,
-                                          valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                accentColor,
+                                              ),
                                         ),
                                       ),
                                       const SizedBox(width: 4),
@@ -558,7 +607,9 @@ class _LocationScreenState extends State<LocationScreen>
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFFCBD5E1),
+                        color: isSelected
+                            ? const Color(0xFF4F46E5)
+                            : const Color(0xFFCBD5E1),
                         width: isSelected ? 7.0 : 2.0,
                       ),
                       color: Colors.white,
@@ -606,9 +657,13 @@ class _LocationScreenState extends State<LocationScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isMock ? 'FALLBACK ACTIVE (GPS BLOCKED/TIMEOUT)' : 'ACQUIRED ADDRESS',
+                  isMock
+                      ? 'FALLBACK ACTIVE (GPS BLOCKED/TIMEOUT)'
+                      : 'ACQUIRED ADDRESS',
                   style: GoogleFonts.inter(
-                    color: isMock ? const Color(0xFFB45309) : const Color(0xFF059669),
+                    color: isMock
+                        ? const Color(0xFFB45309)
+                        : const Color(0xFF059669),
                     fontSize: 8.5,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.5,
@@ -629,11 +684,14 @@ class _LocationScreenState extends State<LocationScreen>
                 Text(
                   isMock
                       ? 'GPS unavailable - click lock icon in browser address bar to allow location'
-                      : (_detectedLocation?.address ?? 'Sector H-13, Islamabad, Pakistan'),
+                      : (_detectedLocation?.address ??
+                            'Sector H-13, Islamabad, Pakistan'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.inter(
-                    color: isMock ? const Color(0xFFB45309) : const Color(0xFF047857),
+                    color: isMock
+                        ? const Color(0xFFB45309)
+                        : const Color(0xFF047857),
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
                   ),
@@ -665,21 +723,82 @@ class HeaderIsometricPainter extends CustomPainter {
     final gridSpacing = 16.0;
 
     for (int i = -8; i <= 8; i++) {
-      final startPt = _isoToScreen(i * gridSpacing, -8 * gridSpacing, originX, originY, cosAngle, sinAngle);
-      final endPt = _isoToScreen(i * gridSpacing, 8 * gridSpacing, originX, originY, cosAngle, sinAngle);
+      final startPt = _isoToScreen(
+        i * gridSpacing,
+        -8 * gridSpacing,
+        originX,
+        originY,
+        cosAngle,
+        sinAngle,
+      );
+      final endPt = _isoToScreen(
+        i * gridSpacing,
+        8 * gridSpacing,
+        originX,
+        originY,
+        cosAngle,
+        sinAngle,
+      );
       canvas.drawLine(startPt, endPt, linePaint);
     }
 
     for (int j = -8; j <= 8; j++) {
-      final startPt = _isoToScreen(-8 * gridSpacing, j * gridSpacing, originX, originY, cosAngle, sinAngle);
-      final endPt = _isoToScreen(8 * gridSpacing, j * gridSpacing, originX, originY, cosAngle, sinAngle);
+      final startPt = _isoToScreen(
+        -8 * gridSpacing,
+        j * gridSpacing,
+        originX,
+        originY,
+        cosAngle,
+        sinAngle,
+      );
+      final endPt = _isoToScreen(
+        8 * gridSpacing,
+        j * gridSpacing,
+        originX,
+        originY,
+        cosAngle,
+        sinAngle,
+      );
       canvas.drawLine(startPt, endPt, linePaint);
     }
 
     // Draw smaller buildings
-    _drawBuilding(canvas, -2.0 * gridSpacing, -2.5 * gridSpacing, 24, 20, 30, originX, originY, cosAngle, sinAngle);
-    _drawBuilding(canvas, 2.5 * gridSpacing, -3.0 * gridSpacing, 20, 20, 25, originX, originY, cosAngle, sinAngle);
-    _drawBuilding(canvas, -2.5 * gridSpacing, 1.5 * gridSpacing, 20, 24, 20, originX, originY, cosAngle, sinAngle);
+    _drawBuilding(
+      canvas,
+      -2.0 * gridSpacing,
+      -2.5 * gridSpacing,
+      24,
+      20,
+      30,
+      originX,
+      originY,
+      cosAngle,
+      sinAngle,
+    );
+    _drawBuilding(
+      canvas,
+      2.5 * gridSpacing,
+      -3.0 * gridSpacing,
+      20,
+      20,
+      25,
+      originX,
+      originY,
+      cosAngle,
+      sinAngle,
+    );
+    _drawBuilding(
+      canvas,
+      -2.5 * gridSpacing,
+      1.5 * gridSpacing,
+      20,
+      24,
+      20,
+      originX,
+      originY,
+      cosAngle,
+      sinAngle,
+    );
 
     final centerOffset = Offset(size.width / 2, size.height * 0.65);
     final radarPaint = Paint()
@@ -697,7 +816,14 @@ class HeaderIsometricPainter extends CustomPainter {
     );
   }
 
-  Offset _isoToScreen(double x, double y, double originX, double originY, double cosAngle, double sinAngle) {
+  Offset _isoToScreen(
+    double x,
+    double y,
+    double originX,
+    double originY,
+    double cosAngle,
+    double sinAngle,
+  ) {
     final screenX = originX + (x - y) * cosAngle;
     final screenY = originY + (x + y) * sinAngle;
     return Offset(screenX, screenY);
@@ -717,8 +843,22 @@ class HeaderIsometricPainter extends CustomPainter {
   ) {
     final p0 = _isoToScreen(x, y, originX, originY, cosAngle, sinAngle);
     final p1 = _isoToScreen(x + width, y, originX, originY, cosAngle, sinAngle);
-    final p2 = _isoToScreen(x + width, y + length, originX, originY, cosAngle, sinAngle);
-    final p3 = _isoToScreen(x, y + length, originX, originY, cosAngle, sinAngle);
+    final p2 = _isoToScreen(
+      x + width,
+      y + length,
+      originX,
+      originY,
+      cosAngle,
+      sinAngle,
+    );
+    final p3 = _isoToScreen(
+      x,
+      y + length,
+      originX,
+      originY,
+      cosAngle,
+      sinAngle,
+    );
 
     final p0Top = Offset(p0.dx, p0.dy - height);
     final p1Top = Offset(p1.dx, p1.dy - height);
@@ -740,7 +880,10 @@ class HeaderIsometricPainter extends CustomPainter {
       ..lineTo(p3Top.dx, p3Top.dy)
       ..lineTo(p0Top.dx, p0Top.dy)
       ..close();
-    canvas.drawPath(leftFace, sidePaint..color = const Color(0xFFEDF2F7).withValues(alpha: 0.6));
+    canvas.drawPath(
+      leftFace,
+      sidePaint..color = const Color(0xFFEDF2F7).withValues(alpha: 0.6),
+    );
     canvas.drawPath(leftFace, outlinePaint);
 
     final rightFace = Path()
@@ -749,7 +892,10 @@ class HeaderIsometricPainter extends CustomPainter {
       ..lineTo(p2Top.dx, p2Top.dy)
       ..lineTo(p3Top.dx, p3Top.dy)
       ..close();
-    canvas.drawPath(rightFace, sidePaint..color = const Color(0xFFE2E8F0).withValues(alpha: 0.6));
+    canvas.drawPath(
+      rightFace,
+      sidePaint..color = const Color(0xFFE2E8F0).withValues(alpha: 0.6),
+    );
     canvas.drawPath(rightFace, outlinePaint);
 
     final topFace = Path()
@@ -758,7 +904,10 @@ class HeaderIsometricPainter extends CustomPainter {
       ..lineTo(p2Top.dx, p2Top.dy)
       ..lineTo(p3Top.dx, p3Top.dy)
       ..close();
-    canvas.drawPath(topFace, sidePaint..color = const Color(0xFFF7FAFC).withValues(alpha: 0.7));
+    canvas.drawPath(
+      topFace,
+      sidePaint..color = const Color(0xFFF7FAFC).withValues(alpha: 0.7),
+    );
     canvas.drawPath(topFace, outlinePaint);
   }
 
@@ -804,13 +953,22 @@ class GradientLocationPinPainter extends CustomPainter {
     path.close();
 
     final pinGradient = const LinearGradient(
-      colors: [Color(0xFF60A5FA), Color(0xFF3B82F6), Color(0xFF6366F1), Color(0xFF8B5CF6)],
+      colors: [
+        Color(0xFF60A5FA),
+        Color(0xFF3B82F6),
+        Color(0xFF6366F1),
+        Color(0xFF8B5CF6),
+      ],
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
     ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
 
     canvas.drawPath(path, Paint()..shader = pinGradient);
-    canvas.drawCircle(Offset(center.dx, size.height * 0.36), size.width * 0.18, Paint()..color = Colors.white);
+    canvas.drawCircle(
+      Offset(center.dx, size.height * 0.36),
+      size.width * 0.18,
+      Paint()..color = Colors.white,
+    );
   }
 
   @override
@@ -873,7 +1031,7 @@ class CardPanelPainter extends CustomPainter {
         ..strokeWidth = 1.2
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round;
-      
+
       final p1 = Offset(size.width * 0.1, size.height * 0.5);
       final p2 = Offset(size.width * 0.22, size.height * 0.65);
       final p3 = Offset(size.width * 0.35, size.height * 0.68);
@@ -901,9 +1059,18 @@ class CardPanelPainter extends CustomPainter {
         ..strokeWidth = 0.8;
 
       final buildings = [
-        RRect.fromRectAndRadius(Rect.fromLTWH(size.width * 0.15, size.height * 0.15, 24, 14), const Radius.circular(4)),
-        RRect.fromRectAndRadius(Rect.fromLTWH(size.width * 0.68, size.height * 0.22, 20, 16), const Radius.circular(4)),
-        RRect.fromRectAndRadius(Rect.fromLTWH(size.width * 0.58, size.height * 0.65, 26, 12), const Radius.circular(4)),
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(size.width * 0.15, size.height * 0.15, 24, 14),
+          const Radius.circular(4),
+        ),
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(size.width * 0.68, size.height * 0.22, 20, 16),
+          const Radius.circular(4),
+        ),
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(size.width * 0.58, size.height * 0.65, 26, 12),
+          const Radius.circular(4),
+        ),
       ];
 
       for (var b in buildings) {
@@ -914,20 +1081,26 @@ class CardPanelPainter extends CustomPainter {
       // Draw trees
       final treeGreen = const Color(0xFF10B981).withValues(alpha: 0.8);
       final treeTrunk = const Color(0xFF94A3B8);
-      
+
       final treePositions = [
         Offset(size.width * 0.38, size.height * 0.3),
         Offset(size.width * 0.82, size.height * 0.68),
       ];
 
       for (var tp in treePositions) {
-        canvas.drawLine(tp, Offset(tp.dx, tp.dy + 6), Paint()..color = treeTrunk..strokeWidth = 1.0);
+        canvas.drawLine(
+          tp,
+          Offset(tp.dx, tp.dy + 6),
+          Paint()
+            ..color = treeTrunk
+            ..strokeWidth = 1.0,
+        );
         canvas.drawCircle(tp, 3.5, Paint()..color = treeGreen);
       }
 
       // Center Demo Pin (Destination point)
       final centerPt = Offset(size.width * 0.49, size.height * 0.5);
-      
+
       // Glowing shadow under pin
       canvas.drawCircle(
         centerPt.translate(0, 1),
@@ -936,7 +1109,7 @@ class CardPanelPainter extends CustomPainter {
           ..color = color.withValues(alpha: 0.1)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
       );
-      
+
       // Pin outer ring
       canvas.drawCircle(
         centerPt,
@@ -990,7 +1163,7 @@ class CardPanelPainter extends CustomPainter {
       // Pulse rings using pulseValue
       final pulseRadius1 = (pulseValue * 30) % 30;
       final pulseRadius2 = ((pulseValue + 0.5) * 30) % 30;
-      
+
       // Pulse 1
       canvas.drawCircle(
         centerPt,
@@ -1043,7 +1216,7 @@ class CardPanelPainter extends CustomPainter {
         ..color = color.withValues(alpha: 0.15)
         ..strokeWidth = 0.8
         ..style = PaintingStyle.stroke;
-      
+
       canvas.drawLine(centerPt, cloudBubbleCenter, linkPaint);
       canvas.drawLine(centerPt, carBubbleCenter, linkPaint);
 
@@ -1056,9 +1229,24 @@ class CardPanelPainter extends CustomPainter {
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5),
       );
       canvas.drawCircle(cloudBubbleCenter, 8, Paint()..color = Colors.white);
-      canvas.drawCircle(cloudBubbleCenter, 8, Paint()..color = const Color(0xFFE2E8F0)..style = PaintingStyle.stroke..strokeWidth = 0.6);
-      canvas.drawCircle(Offset(cloudBubbleCenter.dx - 1.5, cloudBubbleCenter.dy + 1), 2.2, Paint()..color = const Color(0xFF60A5FA));
-      canvas.drawCircle(Offset(cloudBubbleCenter.dx + 1.5, cloudBubbleCenter.dy), 2.6, Paint()..color = const Color(0xFF3B82F6));
+      canvas.drawCircle(
+        cloudBubbleCenter,
+        8,
+        Paint()
+          ..color = const Color(0xFFE2E8F0)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 0.6,
+      );
+      canvas.drawCircle(
+        Offset(cloudBubbleCenter.dx - 1.5, cloudBubbleCenter.dy + 1),
+        2.2,
+        Paint()..color = const Color(0xFF60A5FA),
+      );
+      canvas.drawCircle(
+        Offset(cloudBubbleCenter.dx + 1.5, cloudBubbleCenter.dy),
+        2.6,
+        Paint()..color = const Color(0xFF3B82F6),
+      );
 
       // Right Node (Hazard)
       canvas.drawCircle(
@@ -1069,8 +1257,19 @@ class CardPanelPainter extends CustomPainter {
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5),
       );
       canvas.drawCircle(carBubbleCenter, 8, Paint()..color = Colors.white);
-      canvas.drawCircle(carBubbleCenter, 8, Paint()..color = const Color(0xFFE2E8F0)..style = PaintingStyle.stroke..strokeWidth = 0.6);
-      canvas.drawCircle(carBubbleCenter, 2.5, Paint()..color = const Color(0xFFEF4444));
+      canvas.drawCircle(
+        carBubbleCenter,
+        8,
+        Paint()
+          ..color = const Color(0xFFE2E8F0)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 0.6,
+      );
+      canvas.drawCircle(
+        carBubbleCenter,
+        2.5,
+        Paint()..color = const Color(0xFFEF4444),
+      );
     }
   }
 

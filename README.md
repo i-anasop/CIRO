@@ -31,6 +31,7 @@
 - [Challenge Alignment](#challenge-alignment)
 - [Product Experience](#product-experience)
 - [Technology Stack](#technology-stack)
+- [API Integrations](#api-integrations)
 - [Demo Modes](#demo-modes)
 - [Agentic Architecture](#agentic-architecture)
 - [Google Antigravity Orchestration](#google-antigravity-orchestration)
@@ -136,9 +137,35 @@ Primary screens:
 | Notifications | `flutter_local_notifications` |
 | Maps | Google Maps embeds/routes, `google_maps_flutter`, `flutter_map`, `latlong2` |
 | Live weather | OpenWeather |
-| Public/news signals | NewsAPI |
+| AI reasoning | Groq OpenAI-compatible API, `llama-3.3-70b-versatile` |
+| Public/news signals | NewsAPI, GNews, ReliefWeb public disaster reports |
+| Social/public posts | X API official-handle search with public-signal fallback |
+| Auth/profile support | Google Sign-In, local profile persistence |
 | Styling | Centralized theme tokens in `lib/theme` |
 | Testing | `flutter_test`, `flutter analyze` |
+
+---
+
+## API Integrations
+
+CIRO is demo-safe first and API-enhanced when keys are present. Every external
+service is optional: missing keys, failed requests, rate limits, or sparse
+public data become warnings and fallback signals instead of app crashes.
+
+| API / Service | Environment key | Used for | Fallback |
+| --- | --- | --- | --- |
+| Groq Chat Completions | `GROQ_API_KEY` | Runs the real-mode AI agent pipeline with `llama-3.3-70b-versatile`. | Local deterministic crisis pipeline and typed fallback outputs. |
+| Google Maps / Routes | `GOOGLE_MAPS_API_KEY` | Map support and traffic-aware route delay. | Mock G-10 coordinates and normal route baseline. |
+| OpenWeather | `OPENWEATHER_API_KEY` | Live weather, rainfall, heat, humidity, wind, and crisis risk labels. | No-weather-risk signal with a degraded-mode warning. |
+| NewsAPI | `NEWS_API_KEY` | Crisis-relevant local public/news articles. | GNews, ReliefWeb, and sparse-data warnings. |
+| GNews | `GNEWS_API_KEY` | Additional crisis news search with a free-tier-friendly API. | ReliefWeb public disaster reports. |
+| ReliefWeb / UN OCHA | No key | Public disaster-report fallback used by `GnewsSignalService`. | Empty public feed with warning if no relevant results are found. |
+| X API | `X_BEARER_TOKEN` | Recent official-handle posts from NDMA, Islamabad administration, police, traffic, and highway authorities. | Converts verified news/public signals into social-style public feed cards. |
+| Device/browser location | Runtime permission | User location for Real Mode. | Demo coordinates around G-10, Islamabad. |
+
+The main configuration surface is `lib/services/app_config.dart`. Keys are read
+from `.env`, exposed only through service getters and readiness flags, and are
+not printed in the UI.
 
 ---
 
@@ -168,7 +195,10 @@ Real Mode can use:
 - Google Geocoding for readable location names
 - OpenWeather for current weather risk
 - Google Routes for traffic-aware route delay
-- NewsAPI for local crisis/public signal hints
+- NewsAPI, GNews, and ReliefWeb for crisis/public signal hints
+- X API official-handle search for recent public authority posts
+- Groq for AI-generated crisis classification, response planning, simulation,
+  verification, and stakeholder communications
 - CIRO-derived proxy signals for feeds that are not publicly accessible, such
   as emergency calls, sensors, and field reports
 
@@ -179,21 +209,30 @@ warnings and fallback signals.
 
 ## Agentic Architecture
 
-CIRO runs each scenario through a typed multi-agent pipeline. The agents are
-implemented as deterministic prototype functions so the demo is explainable,
-testable, and stable.
+CIRO has two compatible agentic execution paths:
+
+1. **Demo / deterministic pipeline** - Runs curated scenarios through typed
+   agent functions for repeatable judging, offline demos, and tests.
+2. **Real AI pipeline** - Collects live signals, then asks Groq's
+   `llama-3.3-70b-versatile` model to run the same crisis-intelligence roles.
+   Each AI call requests strict JSON and every failure falls back to typed local
+   defaults.
+
+Both paths produce the same `PipelineResult` shape, so the UI can render crisis
+details, response plans, simulation metrics, agent logs, and Antigravity trace
+events without caring whether the source was deterministic or AI-assisted.
 
 ```mermaid
 flowchart TD
-    A[Signal Sources] --> B[Signal Agent]
-    B --> C[Fusion Agent]
-    C --> D[Detection Agent]
-    D --> E[Severity Agent]
-    E --> F[Resource Agent]
-    F --> G[Response Planner Agent]
-    G --> H[Simulation Agent]
-    H --> I[Verification Agent]
-    I --> J[Antigravity Trace Agent]
+    A[Live + Demo Signal Sources] --> B[Signal/Fusion Agent]
+    B --> C[Detection Agent]
+    C --> D[Evolution Forecast Agent]
+    D --> E[Resource Agent]
+    E --> F[Response Planner Agent]
+    F --> G[Simulation Agent]
+    G --> H[Verification Agent]
+    H --> I[Stakeholder Communications Agent]
+    I --> J[Antigravity Trace + Agent Logs]
     J --> K[Mobile Command Center UI]
 ```
 
@@ -201,20 +240,22 @@ Agent responsibilities:
 
 | Agent | Responsibility |
 | --- | --- |
-| Signal Agent | Normalizes social, weather, traffic, citizen, sensor, emergency-call, and field signals. |
-| Fusion Agent | Scores source credibility, geolocation confidence, urgency language, and contradiction level. |
-| Detection Agent | Classifies crisis type and extracts incident location. |
-| Severity Agent | Predicts severity, affected population, duration, peak impact, spread risk, and uncertainty. |
+| Signal / Fusion Agent | Normalizes and fuses weather, traffic, news, social/public, citizen, sensor, emergency-call, and field signals. |
+| Detection Agent | Classifies crisis type, severity, confidence, affected people, and incident location. |
+| Evolution Forecast Agent | Predicts affected radius, duration, peak impact, spread risk, and uncertainty. |
 | Resource Agent | Allocates constrained resources based on impact, urgency, confidence, population, and trade-offs. |
 | Response Planner Agent | Builds ordered dispatch actions with owner, ETA, priority, and status. |
 | Simulation Agent | Computes before/after operational impact and possible side effects. |
 | Verification Agent | Handles confirmed signals, low confidence, conflicts, false positives, and escalation. |
-| Antigravity Trace Agent | Emits structured trace events for decision evidence and judge review. |
+| Stakeholder Communications Agent | Generates public, emergency services, hospital, utility, transport, media, and command-center messages. |
+| Antigravity Trace Agent | Emits structured trace events and agent logs for decision evidence and judge review. |
 
 Implementation entry points:
 
 - `lib/services/scenario_engine.dart`
 - `lib/agents/agent_pipeline.dart`
+- `lib/agents/ai_agent_pipeline.dart`
+- `lib/services/groq_service.dart`
 - `lib/services/real_signal_service.dart`
 - `lib/services/real_scenario_adapter.dart`
 
@@ -261,6 +302,10 @@ The public UI intentionally shows this evidence in simple language through the
 `PipelineResult.antigravityTraceExport` for judging, testing, and future
 integration with a dedicated Antigravity trace viewer.
 
+In Real Mode, trace and agent-log entries are labeled with the active engine:
+`Groq (Llama 3.3)` when `GROQ_API_KEY` is configured, or
+`Local Deterministic` when CIRO is running without an AI key.
+
 Validated by test:
 
 ```dart
@@ -298,12 +343,13 @@ flowchart LR
     A[User Location] --> B[Reverse Geocoding]
     B --> C[OpenWeather]
     B --> D[Google Routes]
-    B --> E[NewsAPI]
-    C --> F[Real Signal Bundle]
-    D --> F
-    E --> F
-    F --> G[Real Scenario Adapter]
-    G --> H[Agent Pipeline]
+    B --> E[NewsAPI + GNews + ReliefWeb]
+    B --> F[X Official Posts]
+    C --> G[Real Signal Bundle]
+    D --> G
+    E --> G
+    F --> G
+    G --> H[Groq AI Pipeline or Local Fallback]
     H --> I[Command Center]
 ```
 
@@ -316,6 +362,9 @@ Source behavior:
 | Weather | `WeatherService` | Adds warning and continues with no-weather-risk signal. |
 | Routes | `RoutesService` | Adds warning and continues with normal route baseline. |
 | News | `NewsSignalService` | Adds sparse-data warning and continues with weather/route/location signals. |
+| GNews / ReliefWeb | `GnewsSignalService` | Uses GNews when keyed; otherwise tries ReliefWeb public reports. |
+| Social posts | `SocialSignalService` | Uses X API when keyed; otherwise converts public news into social-style signals. |
+| AI reasoning | `AiAgentPipeline` + `GroqService` | Uses Groq when keyed; otherwise emits local deterministic fallback outputs. |
 | Private feeds | `RealScenarioAdapter` | Creates clearly labeled CIRO-derived proxy signals. |
 
 This keeps the prototype functional even when public APIs are incomplete,
@@ -415,6 +464,7 @@ Recovery cases:
 lib/
   agents/
     agent_pipeline.dart        # Multi-agent pipeline and trace generation
+    ai_agent_pipeline.dart     # Groq-powered real-mode agent pipeline
     signal_agent.dart          # Signal normalization placeholder
 
   components/
@@ -437,6 +487,7 @@ lib/
     pipeline_result.dart
     route_result.dart
     simulation_result.dart
+    social_post_signal.dart
     weather_result.dart
 
   navigation/
@@ -457,13 +508,18 @@ lib/
     app_config.dart
     app_mode_service.dart
     geocoding_service.dart
+    gnews_signal_service.dart
+    groq_service.dart
     location_service.dart
     news_signal_service.dart
     notification_service.dart
+    places_service.dart
+    post_database_service.dart
     real_signal_service.dart
     real_scenario_adapter.dart
     routes_service.dart
     scenario_engine.dart
+    social_signal_service.dart
     user_profile_service.dart
     weather_service.dart
 
@@ -507,9 +563,14 @@ Create a root `.env` file:
 GOOGLE_MAPS_API_KEY=your_google_maps_or_routes_key
 OPENWEATHER_API_KEY=your_openweather_key
 NEWS_API_KEY=your_newsapi_key
+GNEWS_API_KEY=your_gnews_key
+GROQ_API_KEY=your_groq_key
+X_BEARER_TOKEN=your_x_api_bearer_token
 ```
 
 The app still runs without keys. Demo Mode is fully functional offline.
+Real Mode becomes progressively richer as keys are added, with Groq enabling
+the full AI agent pipeline and the other APIs expanding live signal coverage.
 
 ### Run Web
 

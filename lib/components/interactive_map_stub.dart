@@ -10,6 +10,8 @@ Widget createInteractiveMap({
   bool showRiskZone = false,
   bool showAltRoute = false,
   int recenterSignal = 0,
+  double? mapCenterLatitude,
+  double? mapCenterLongitude,
 }) {
   return _CiroFlutterMap(
     latitude: latitude,
@@ -19,6 +21,8 @@ Widget createInteractiveMap({
     showRiskZone: showRiskZone,
     showAltRoute: showAltRoute,
     recenterSignal: recenterSignal,
+    mapCenterLatitude: mapCenterLatitude,
+    mapCenterLongitude: mapCenterLongitude,
   );
 }
 
@@ -30,6 +34,8 @@ class _CiroFlutterMap extends StatefulWidget {
   final bool showRiskZone;
   final bool showAltRoute;
   final int recenterSignal;
+  final double? mapCenterLatitude;
+  final double? mapCenterLongitude;
 
   const _CiroFlutterMap({
     required this.latitude,
@@ -39,6 +45,8 @@ class _CiroFlutterMap extends StatefulWidget {
     required this.showRiskZone,
     required this.showAltRoute,
     required this.recenterSignal,
+    this.mapCenterLatitude,
+    this.mapCenterLongitude,
   });
 
   @override
@@ -48,14 +56,20 @@ class _CiroFlutterMap extends StatefulWidget {
 class _CiroFlutterMapState extends State<_CiroFlutterMap> {
   final MapController _controller = MapController();
 
-  LatLng get _center => LatLng(widget.latitude, widget.longitude);
+  LatLng get _center => LatLng(
+    widget.mapCenterLatitude ?? widget.latitude,
+    widget.mapCenterLongitude ?? widget.longitude,
+  );
+  LatLng get _markerPoint => LatLng(widget.latitude, widget.longitude);
 
   @override
   void didUpdateWidget(covariant _CiroFlutterMap oldWidget) {
     super.didUpdateWidget(oldWidget);
     final locationChanged =
         oldWidget.latitude != widget.latitude ||
-        oldWidget.longitude != widget.longitude;
+        oldWidget.longitude != widget.longitude ||
+        oldWidget.mapCenterLatitude != widget.mapCenterLatitude ||
+        oldWidget.mapCenterLongitude != widget.mapCenterLongitude;
     final recenterRequested = oldWidget.recenterSignal != widget.recenterSignal;
     if (locationChanged || oldWidget.zoom != widget.zoom || recenterRequested) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -66,7 +80,8 @@ class _CiroFlutterMapState extends State<_CiroFlutterMap> {
 
   @override
   Widget build(BuildContext context) {
-    final route = _routePoints(_center);
+    final markerPoint = _markerPoint;
+    final route = _routePoints(markerPoint);
     return FlutterMap(
       mapController: _controller,
       options: MapOptions(
@@ -114,7 +129,7 @@ class _CiroFlutterMapState extends State<_CiroFlutterMap> {
           CircleLayer(
             circles: [
               CircleMarker(
-                point: _center,
+                point: markerPoint,
                 radius: 800,
                 useRadiusInMeter: true,
                 color: const Color(0xFFEF4444).withValues(alpha: 0.14),
@@ -122,7 +137,7 @@ class _CiroFlutterMapState extends State<_CiroFlutterMap> {
                 borderStrokeWidth: 2,
               ),
               CircleMarker(
-                point: _center,
+                point: markerPoint,
                 radius: 380,
                 useRadiusInMeter: true,
                 color: const Color(0xFF3B82F6).withValues(alpha: 0.12),
@@ -144,7 +159,7 @@ class _CiroFlutterMapState extends State<_CiroFlutterMap> {
         MarkerLayer(
           markers: [
             Marker(
-              point: _center,
+              point: markerPoint,
               width: 54,
               height: 54,
               child: _MapPin(

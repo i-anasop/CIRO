@@ -7,12 +7,14 @@
 import '../models/location_result.dart';
 import '../models/weather_result.dart';
 import '../models/news_signal.dart';
+import '../models/social_post_signal.dart';
 import '../models/route_result.dart';
 import 'location_service.dart';
 import 'geocoding_service.dart';
 import 'weather_service.dart';
 import 'news_signal_service.dart';
 import 'gnews_signal_service.dart';
+import 'social_signal_service.dart';
 import 'routes_service.dart';
 import 'app_config.dart';
 import '../models/crisis.dart';
@@ -23,6 +25,7 @@ class RealSignalBundle {
   final LocationResult location;
   final WeatherResult? weather;
   final List<NewsSignal> newsSignals;
+  final List<SocialPostSignal> socialPosts;
   final RouteResult? traffic;
   final bool succeeded;
   final List<String> warnings;
@@ -31,22 +34,27 @@ class RealSignalBundle {
     required this.location,
     this.weather,
     this.newsSignals = const [],
+    this.socialPosts = const [],
     this.traffic,
     required this.succeeded,
-    this.warnings    = const [],
+    this.warnings = const [],
   });
 
   /// Returns true if we got meaningful data from at least one real source.
   bool get hasRealData =>
       (weather?.isSuccess == true) ||
       newsSignals.isNotEmpty ||
+      socialPosts.isNotEmpty ||
       (traffic?.isSuccess == true);
 
   /// Active signal count (for UI display).
   int get signalCount {
     int count = 0;
-    if (weather?.isSuccess == true && weather?.isCrisisRelevant == true) count++;
+    if (weather?.isSuccess == true && weather?.isCrisisRelevant == true) {
+      count++;
+    }
     count += newsSignals.length;
+    count += socialPosts.length;
     if (traffic?.isSuccess == true) count++;
     return count;
   }
@@ -55,7 +63,12 @@ class RealSignalBundle {
   String get summary {
     final parts = <String>[];
     if (weather?.isSuccess == true) parts.add(weather!.rawSummary);
-    if (newsSignals.isNotEmpty)     parts.add('${newsSignals.length} news signal(s)');
+    if (newsSignals.isNotEmpty) {
+      parts.add('${newsSignals.length} news signal(s)');
+    }
+    if (socialPosts.isNotEmpty) {
+      parts.add('${socialPosts.length} social signal(s)');
+    }
     if (traffic?.isSuccess == true) {
       parts.add('Traffic: ${traffic!.congestionLabel}');
     }
@@ -81,9 +94,9 @@ class RealSignalService {
     LocationResult location;
     if (latitude != null && longitude != null) {
       location = LocationResult(
-        latitude:  latitude,
+        latitude: latitude,
         longitude: longitude,
-        isMock:    false,
+        isMock: false,
         isSuccess: true,
       );
     } else if (useMockLocation) {
@@ -102,8 +115,8 @@ class RealSignalService {
       location = await GeocodingService.instance.reverseGeocode(location);
     }
 
-    final lat  = location.latitude  ?? 33.6946;
-    final lon  = location.longitude ?? 73.0179;
+    final lat = location.latitude ?? 33.6946;
+    final lon = location.longitude ?? 73.0179;
     final city = location.city.isNotEmpty ? location.city : 'Islamabad';
 
     // 3. Weather, news, and routes fetched in parallel
@@ -112,21 +125,27 @@ class RealSignalService {
         : Future.value(WeatherResult.failure('No OpenWeather key configured'));
 
     // News: Try NewsAPI first, then GNews + ReliefWeb (always try both in parallel)
-    final locationQuery = location.area.isNotEmpty ? '${location.area} $city' : city;
-    final newsFuture = Future.wait([
-      AppConfig.instance.hasNewsApiKey
-          ? NewsSignalService.instance.fetchSignals(locationQuery)
-          : Future.value(<NewsSignal>[]),
-      GnewsSignalService.instance.fetchSignals(locationQuery),
-    ]).then((results) {
-      final combined = <NewsSignal>[...results[0], ...results[1]];
-      // Deduplicate by title similarity
-      final seen = <String>{};
-      return combined.where((s) {
-        final key = s.title.substring(0, s.title.length.clamp(0, 40));
-        return seen.add(key);
-      }).take(5).toList();
-    });
+    final locationQuery = location.area.isNotEmpty
+        ? '${location.area} $city'
+        : city;
+    final newsFuture =
+        Future.wait([
+          AppConfig.instance.hasNewsApiKey
+              ? NewsSignalService.instance.fetchSignals(locationQuery)
+              : Future.value(<NewsSignal>[]),
+          GnewsSignalService.instance.fetchSignals(locationQuery),
+        ]).then((results) {
+          final combined = <NewsSignal>[...results[0], ...results[1]];
+          // Deduplicate by title similarity
+          final seen = <String>{};
+          return combined
+              .where((s) {
+                final key = s.title.substring(0, s.title.length.clamp(0, 40));
+                return seen.add(key);
+              })
+              .take(5)
+              .toList();
+        });
 
     final routesFuture = AppConfig.instance.hasGoogleMapsKey
         ? RoutesService.instance.getTrafficConditions(lat, lon)
@@ -139,12 +158,12 @@ class RealSignalService {
       routesFuture,
     ]);
 
-    final weather    = results[0] as WeatherResult;
-    final news       = results[1] as List<NewsSignal>;
-    final traffic    = results[2] as RouteResult;
+    final weather = results[0] as WeatherResult;
+    final news = results[1] as List<NewsSignal>;
+    final traffic = results[2] as RouteResult;
 
-    if (!weather.isSuccess)  warnings.add('Weather: ${weather.errorMessage}');
-    if (!traffic.isSuccess)  warnings.add('Traffic: ${traffic.errorMessage}');
+    if (!weather.isSuccess) warnings.add('Weather: ${weather.errorMessage}');
+    if (!traffic.isSuccess) warnings.add('Traffic: ${traffic.errorMessage}');
     if (!AppConfig.instance.hasNewsApiKey) {
       warnings.add('News/Public Feed: No NewsAPI key configured');
     } else if (news.isEmpty) {
@@ -162,8 +181,13 @@ class RealSignalService {
     if (injectedType != null) {
       warnings.add('Real Mode: Simulated threat signals injected for testing.');
       // Clear key/service warnings to prevent dashboard clutter
-      warnings.removeWhere((w) => w.contains('Weather:') || w.contains('Traffic:') || w.contains('News/Public Feed:'));
-      
+      warnings.removeWhere(
+        (w) =>
+            w.contains('Weather:') ||
+            w.contains('Traffic:') ||
+            w.contains('News/Public Feed:'),
+      );
+
       switch (injectedType) {
         case CrisisType.urbanFlooding:
           finalWeather = WeatherResult(
@@ -180,8 +204,10 @@ class RealSignalService {
           );
           finalNews = [
             NewsSignal(
-              title: 'Flash flooding and waterlogging reported on major roads near $city.',
-              description: 'Continuous torrential rains have inundated low-lying areas in $city. Civil authorities advise caution.',
+              title:
+                  'Flash flooding and waterlogging reported on major roads near $city.',
+              description:
+                  'Continuous torrential rains have inundated low-lying areas in $city. Civil authorities advise caution.',
               source: 'Met Office Alert',
               matchedKeyword: 'flood',
               publishedAt: DateTime.now(),
@@ -213,8 +239,10 @@ class RealSignalService {
           );
           finalNews = [
             NewsSignal(
-              title: 'Government issues red alert for extreme heatwave in $city region.',
-              description: 'Temperatures projected to touch 44°C. cooling centers activated. Citizens advised to remain indoors.',
+              title:
+                  'Government issues red alert for extreme heatwave in $city region.',
+              description:
+                  'Temperatures projected to touch 44°C. cooling centers activated. Citizens advised to remain indoors.',
               source: 'Public Health Department',
               matchedKeyword: 'heatwave',
               publishedAt: DateTime.now(),
@@ -246,8 +274,10 @@ class RealSignalService {
           );
           finalNews = [
             NewsSignal(
-              title: 'Major multi-vehicle accident reported near geocoded sector in $city.',
-              description: 'Emergency services responding to a crash. Lane closures causing severe delays.',
+              title:
+                  'Major multi-vehicle accident reported near geocoded sector in $city.',
+              description:
+                  'Emergency services responding to a crash. Lane closures causing severe delays.',
               source: 'Police Dispatch',
               matchedKeyword: 'accident',
               publishedAt: DateTime.now(),
@@ -279,8 +309,10 @@ class RealSignalService {
           );
           finalNews = [
             NewsSignal(
-              title: 'Power grid substation failure causes major outage in $city.',
-              description: 'Electricity offline in multiple sectors. Utility crews estimate 3 hours for complete restoration.',
+              title:
+                  'Power grid substation failure causes major outage in $city.',
+              description:
+                  'Electricity offline in multiple sectors. Utility crews estimate 3 hours for complete restoration.',
               source: 'Grid Operations',
               matchedKeyword: 'outage',
               publishedAt: DateTime.now(),
@@ -312,8 +344,10 @@ class RealSignalService {
           );
           finalNews = [
             NewsSignal(
-              title: 'Significant road blockage reported on main arterial corridor in $city.',
-              description: 'All lanes blocked due to structural hazard/debris. Commuters urged to take alternative routes.',
+              title:
+                  'Significant road blockage reported on main arterial corridor in $city.',
+              description:
+                  'All lanes blocked due to structural hazard/debris. Commuters urged to take alternative routes.',
               source: 'Municipal Transit',
               matchedKeyword: 'blockage',
               publishedAt: DateTime.now(),
@@ -333,13 +367,23 @@ class RealSignalService {
       }
     }
 
+    final socialPosts = await SocialSignalService.instance.fetchRelevantPosts(
+      city: city,
+      fallbackNews: finalNews,
+    );
+
     return RealSignalBundle(
-      location:    location,
-      weather:     finalWeather.isSuccess ? finalWeather : null,
+      location: location,
+      weather: finalWeather.isSuccess ? finalWeather : null,
       newsSignals: finalNews,
-      traffic:     finalTraffic.isSuccess ? finalTraffic : null,
-      succeeded:   finalWeather.isSuccess || finalNews.isNotEmpty || finalTraffic.isSuccess,
-      warnings:    warnings,
+      socialPosts: socialPosts,
+      traffic: finalTraffic.isSuccess ? finalTraffic : null,
+      succeeded:
+          finalWeather.isSuccess ||
+          finalNews.isNotEmpty ||
+          socialPosts.isNotEmpty ||
+          finalTraffic.isSuccess,
+      warnings: warnings,
     );
   }
 
@@ -347,9 +391,9 @@ class RealSignalService {
   Map<String, bool> checkReadiness() {
     final cfg = AppConfig.instance;
     return {
-      'Google Maps / Routes':  cfg.hasGoogleMapsKey,
-      'OpenWeather':           cfg.hasOpenWeatherKey,
-      'NewsAPI':               cfg.hasNewsApiKey,
+      'Google Maps / Routes': cfg.hasGoogleMapsKey,
+      'OpenWeather': cfg.hasOpenWeatherKey,
+      'NewsAPI': cfg.hasNewsApiKey,
     };
   }
 }

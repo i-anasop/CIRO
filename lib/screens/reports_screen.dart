@@ -79,11 +79,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   IconData _iconFromName(String name) {
     switch (name) {
-      case 'water_drop': return Icons.water_drop_rounded;
-      case 'car_crash': return Icons.car_crash_rounded;
-      case 'power_off': return Icons.power_off_rounded;
-      case 'thermostat': return Icons.thermostat_rounded;
-      default: return Icons.warning_rounded;
+      case 'water_drop':
+        return Icons.water_drop_rounded;
+      case 'car_crash':
+        return Icons.car_crash_rounded;
+      case 'power_off':
+        return Icons.power_off_rounded;
+      case 'thermostat':
+        return Icons.thermostat_rounded;
+      default:
+        return Icons.warning_rounded;
     }
   }
 
@@ -123,14 +128,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
     for (final map in list) {
       final author = map['author'] ?? 'Anonymous';
       final avatarColor = map['avatarIndex'] != null
-          ? UserProfileService.avatarColors[(map['avatarIndex'] as int).clamp(0, UserProfileService.avatarColors.length - 1)]
+          ? UserProfileService.avatarColors[(map['avatarIndex'] as int).clamp(
+              0,
+              UserProfileService.avatarColors.length - 1,
+            )]
           : null;
       final avatarIcon = map['avatarIndex'] != null
-          ? UserProfileService.avatarIcons[(map['avatarIndex'] as int).clamp(0, UserProfileService.avatarIcons.length - 1)]
+          ? UserProfileService.avatarIcons[(map['avatarIndex'] as int).clamp(
+              0,
+              UserProfileService.avatarIcons.length - 1,
+            )]
           : null;
       persistedItems.add(
         _FeedPost(
-          id: map['timestamp']?.toString() ?? DateTime.now().microsecondsSinceEpoch.toString(),
+          id:
+              map['timestamp']?.toString() ??
+              DateTime.now().microsecondsSinceEpoch.toString(),
           author: author,
           handle: map['handle'] ?? '@local_reporter',
           avatarText: author.isNotEmpty ? author[0].toUpperCase() : 'A',
@@ -456,9 +469,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 112),
           children: [
-            _FeedHeader(
-              onBack: () => context.go('/home'),
-            ),
+            _FeedHeader(onBack: () => context.go('/home')),
             const SizedBox(height: 14),
             _ComposerCard(
               controller: _postController,
@@ -534,15 +545,15 @@ class _LivePulseDotState extends State<_LivePulseDot>
           width: 8,
           height: 8,
           decoration: BoxDecoration(
-            color: const Color(0xFF10B981).withValues(
-              alpha: 0.3 + (_controller.value * 0.7),
-            ),
+            color: const Color(
+              0xFF10B981,
+            ).withValues(alpha: 0.3 + (_controller.value * 0.7)),
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF10B981).withValues(
-                  alpha: _controller.value * 0.5,
-                ),
+                color: const Color(
+                  0xFF10B981,
+                ).withValues(alpha: _controller.value * 0.5),
                 blurRadius: 6,
                 spreadRadius: 2,
               ),
@@ -666,7 +677,8 @@ class _ComposerCard extends StatelessWidget {
             children: [
               ListenableBuilder(
                 listenable: UserProfileService.instance,
-                builder: (context, _) => _ProfileAvatar(profile: profile, radius: 24),
+                builder: (context, _) =>
+                    _ProfileAvatar(profile: profile, radius: 24),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -695,11 +707,17 @@ class _ComposerCard extends StatelessWidget {
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(22),
-                      borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 0.8),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFE2E8F0),
+                        width: 0.8,
+                      ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(22),
-                      borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 0.8),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFE2E8F0),
+                        width: 0.8,
+                      ),
                     ),
                     counterText: '',
                   ),
@@ -900,7 +918,9 @@ class _FilterTabs extends StatelessWidget {
                   boxShadow: active
                       ? [
                           BoxShadow(
-                            color: const Color(0xFF4E54E1).withValues(alpha: 0.2),
+                            color: const Color(
+                              0xFF4E54E1,
+                            ).withValues(alpha: 0.2),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -939,7 +959,8 @@ class _PostCard extends StatefulWidget {
   State<_PostCard> createState() => _PostCardState();
 }
 
-class _PostCardState extends State<_PostCard> with SingleTickerProviderStateMixin {
+class _PostCardState extends State<_PostCard>
+    with SingleTickerProviderStateMixin {
   late AnimationController _likeController;
   late Animation<double> _scaleAnimation;
 
@@ -1013,7 +1034,9 @@ class _PostCardState extends State<_PostCard> with SingleTickerProviderStateMixi
                   child: CircleAvatar(
                     radius: 20,
                     backgroundColor: widget.post.color.withValues(alpha: 0.12),
-                    backgroundImage: _getAvatarImage(widget.post.avatarImageData),
+                    backgroundImage: _getAvatarImage(
+                      widget.post.avatarImageData,
+                    ),
                     child: widget.post.avatarImageData != null
                         ? null
                         : Icon(
@@ -1067,7 +1090,11 @@ class _PostCardState extends State<_PostCard> with SingleTickerProviderStateMixi
                   ],
                 ),
               ),
-              _Pill(icon: widget.post.icon, label: widget.post.tag, color: widget.post.color),
+              _Pill(
+                icon: widget.post.icon,
+                label: widget.post.tag,
+                color: widget.post.color,
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -1110,7 +1137,10 @@ class _PostCardState extends State<_PostCard> with SingleTickerProviderStateMixi
           ),
           if (widget.post.comments.isNotEmpty) ...[
             const SizedBox(height: 10),
-            _LatestComment(comment: widget.post.comments.last, color: widget.post.color),
+            _LatestComment(
+              comment: widget.post.comments.last,
+              color: widget.post.color,
+            ),
           ],
         ],
       ),
@@ -1162,7 +1192,10 @@ class _PostMedia extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        border: Border.all(color: post.imageTone.withValues(alpha: 0.08), width: 1.0),
+        border: Border.all(
+          color: post.imageTone.withValues(alpha: 0.08),
+          width: 1.0,
+        ),
       ),
       child: Stack(
         children: [
@@ -1171,11 +1204,7 @@ class _PostMedia extends StatelessWidget {
             top: -24,
             child: Opacity(
               opacity: 0.08,
-              child: Icon(
-                post.icon,
-                size: 156,
-                color: post.color,
-              ),
+              child: Icon(post.icon, size: 156, color: post.color),
             ),
           ),
           Positioned(
@@ -1450,7 +1479,11 @@ class _LatestComment extends StatelessWidget {
             backgroundColor: color.withValues(alpha: 0.12),
             child: Text(
               comment.author.characters.first.toUpperCase(),
-              style: TextStyle(color: color, fontSize: 8, fontWeight: FontWeight.w900),
+              style: TextStyle(
+                color: color,
+                fontSize: 8,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
           const SizedBox(width: 8),
@@ -1944,129 +1977,200 @@ class _FeedPost {
   }
 }
 
-List<_FeedPost> _seedPosts() => const [
-  _FeedPost(
-    id: 'post-1',
-    author: 'Ayesha Khan',
-    handle: '@g10_resident',
-    avatarText: 'A',
-    time: '4m',
-    title: 'Urban flooding',
-    body:
-        'Water is rising near G-10 Markaz. Smaller cars are slowing down and shop entrances are getting wet.',
-    location: 'G-10 Markaz',
-    tag: 'Verified',
-    icon: Icons.water_drop_rounded,
-    color: Color(0xFF2563EB),
-    imageTone: Color(0xFF2563EB),
-    likes: 42,
-    views: 1800,
-    isOfficial: false,
-    comments: [
-      _Comment(
-        author: 'CIRO verifier',
-        handle: '@ciro',
-        text: 'Matched with rainfall and traffic slowdown nearby.',
-      ),
-      _Comment(
-        author: 'Nearby shopkeeper',
-        handle: '@markaz_shop',
-        text: 'Water is close to the front steps now.',
-      ),
-    ],
-  ),
-  _FeedPost(
-    id: 'post-2',
-    author: 'Traffic Warden Unit',
-    handle: '@ict_traffic',
-    avatarText: 'T',
-    time: '8m',
-    title: 'Traffic disruption',
-    body:
-        'Three nearby road segments are moving below normal speed. Drivers should avoid the service road beside G-10/2.',
-    location: 'Service Road West',
-    tag: 'Traffic',
-    icon: Icons.traffic_rounded,
-    color: Color(0xFFF97316),
-    imageTone: Color(0xFFF97316),
-    likes: 31,
-    views: 1420,
-    isOfficial: true,
-    comments: [
-      _Comment(
-        author: 'Route Monitor',
-        handle: '@ciro_routes',
-        text: 'North-side approach is currently safer for responders.',
-      ),
-    ],
-  ),
-  _FeedPost(
-    id: 'post-3',
-    author: 'Relief Desk',
-    handle: '@ciro_relief',
-    avatarText: 'R',
-    time: '12m',
-    title: 'Shelter ready',
-    body:
-        'G-10 Community Center can receive families if water enters homes. Basic meals and first aid are available.',
-    location: 'G-10 Community Center',
-    tag: 'Ready',
-    icon: Icons.home_work_rounded,
-    color: Color(0xFF10B981),
-    imageTone: Color(0xFF10B981),
-    likes: 28,
-    views: 980,
-    isOfficial: true,
-    comments: [
-      _Comment(
-        author: 'Resident volunteer',
-        handle: '@g10_help',
-        text: 'We can help guide families from the market side.',
-      ),
-    ],
-  ),
-  _FeedPost(
-    id: 'post-4',
-    author: 'PIMS Emergency Desk',
-    handle: '@pims_intake',
-    avatarText: 'P',
-    time: '15m',
-    title: 'Hospital preparedness',
-    body:
-        'Emergency wing is ready for minor injuries and exposure cases from nearby flooded lanes.',
-    location: 'PIMS',
-    tag: 'Hospital',
-    icon: Icons.local_hospital_rounded,
-    color: Color(0xFF0EA5E9),
-    imageTone: Color(0xFF0EA5E9),
-    likes: 24,
-    views: 860,
-    isOfficial: true,
-    comments: [],
-  ),
-  _FeedPost(
-    id: 'post-5',
-    author: 'Field Team 3',
-    handle: '@field_ops',
-    avatarText: 'F',
-    time: '18m',
-    title: 'Drainage inspection',
-    body:
-        'Standing water reported near the market edge. Utility team asked to inspect a possible drain blockage.',
-    location: 'G-10/2',
-    tag: 'Action',
-    icon: Icons.construction_rounded,
-    color: Color(0xFF8B5CF6),
-    imageTone: Color(0xFF8B5CF6),
-    likes: 19,
-    views: 730,
-    isOfficial: true,
-    comments: [
-      _Comment(
-        author: 'Utility desk',
-        handle: '@utility_ops',
-        text: 'Crew has been assigned for verification.',
-      ),
-    ],
-  ),
-];
+List<_FeedPost> _seedPosts() {
+  if (!AppModeService.instance.isDemoMode) {
+    final socialPosts = ScenarioEngine.instance.latestSocialPosts;
+    if (socialPosts.isNotEmpty) {
+      return socialPosts.map((post) {
+        final color = _socialColor(post.matchedKeyword);
+        return _FeedPost(
+          id: post.id,
+          author: post.author,
+          handle: post.handle,
+          avatarText: post.author.characters.first.toUpperCase(),
+          time: post.ageLabel,
+          title: 'Relevant public update',
+          body: post.text,
+          location: post.location,
+          tag: post.verifiedSource ? 'Official watch' : 'Public signal',
+          icon: _socialIcon(post.matchedKeyword),
+          color: color,
+          imageTone: color,
+          likes: (post.confidence * 18).round().clamp(4, 22),
+          views: (post.confidence * 90).round().clamp(18, 120),
+          isOfficial: post.verifiedSource,
+          comments: const [
+            _Comment(
+              author: 'CIRO verifier',
+              handle: '@ciro',
+              text: 'Matched to live city signal sources for review.',
+            ),
+          ],
+        );
+      }).toList();
+    }
+  }
+
+  return const [
+    _FeedPost(
+      id: 'post-1',
+      author: 'Ayesha Khan',
+      handle: '@g10_resident',
+      avatarText: 'A',
+      time: '4m',
+      title: 'Urban flooding',
+      body:
+          'Water is rising near G-10 Markaz. Smaller cars are slowing down and shop entrances are getting wet.',
+      location: 'G-10 Markaz',
+      tag: 'Verified',
+      icon: Icons.water_drop_rounded,
+      color: Color(0xFF2563EB),
+      imageTone: Color(0xFF2563EB),
+      likes: 42,
+      views: 1800,
+      isOfficial: false,
+      comments: [
+        _Comment(
+          author: 'CIRO verifier',
+          handle: '@ciro',
+          text: 'Matched with rainfall and traffic slowdown nearby.',
+        ),
+        _Comment(
+          author: 'Nearby shopkeeper',
+          handle: '@markaz_shop',
+          text: 'Water is close to the front steps now.',
+        ),
+      ],
+    ),
+    _FeedPost(
+      id: 'post-2',
+      author: 'Traffic Warden Unit',
+      handle: '@ict_traffic',
+      avatarText: 'T',
+      time: '8m',
+      title: 'Traffic disruption',
+      body:
+          'Three nearby road segments are moving below normal speed. Drivers should avoid the service road beside G-10/2.',
+      location: 'Service Road West',
+      tag: 'Traffic',
+      icon: Icons.traffic_rounded,
+      color: Color(0xFFF97316),
+      imageTone: Color(0xFFF97316),
+      likes: 31,
+      views: 1420,
+      isOfficial: true,
+      comments: [
+        _Comment(
+          author: 'Route Monitor',
+          handle: '@ciro_routes',
+          text: 'North-side approach is currently safer for responders.',
+        ),
+      ],
+    ),
+    _FeedPost(
+      id: 'post-3',
+      author: 'Relief Desk',
+      handle: '@ciro_relief',
+      avatarText: 'R',
+      time: '12m',
+      title: 'Shelter ready',
+      body:
+          'G-10 Community Center can receive families if water enters homes. Basic meals and first aid are available.',
+      location: 'G-10 Community Center',
+      tag: 'Ready',
+      icon: Icons.home_work_rounded,
+      color: Color(0xFF10B981),
+      imageTone: Color(0xFF10B981),
+      likes: 28,
+      views: 980,
+      isOfficial: true,
+      comments: [
+        _Comment(
+          author: 'Resident volunteer',
+          handle: '@g10_help',
+          text: 'We can help guide families from the market side.',
+        ),
+      ],
+    ),
+    _FeedPost(
+      id: 'post-4',
+      author: 'PIMS Emergency Desk',
+      handle: '@pims_intake',
+      avatarText: 'P',
+      time: '15m',
+      title: 'Hospital preparedness',
+      body:
+          'Emergency wing is ready for minor injuries and exposure cases from nearby flooded lanes.',
+      location: 'PIMS',
+      tag: 'Hospital',
+      icon: Icons.local_hospital_rounded,
+      color: Color(0xFF0EA5E9),
+      imageTone: Color(0xFF0EA5E9),
+      likes: 24,
+      views: 860,
+      isOfficial: true,
+      comments: [],
+    ),
+    _FeedPost(
+      id: 'post-5',
+      author: 'Field Team 3',
+      handle: '@field_ops',
+      avatarText: 'F',
+      time: '18m',
+      title: 'Drainage inspection',
+      body:
+          'Standing water reported near the market edge. Utility team asked to inspect a possible drain blockage.',
+      location: 'G-10/2',
+      tag: 'Action',
+      icon: Icons.construction_rounded,
+      color: Color(0xFF8B5CF6),
+      imageTone: Color(0xFF8B5CF6),
+      likes: 19,
+      views: 730,
+      isOfficial: true,
+      comments: [
+        _Comment(
+          author: 'Utility desk',
+          handle: '@utility_ops',
+          text: 'Crew has been assigned for verification.',
+        ),
+      ],
+    ),
+  ];
+}
+
+IconData _socialIcon(String keyword) {
+  final text = keyword.toLowerCase();
+  if (text.contains('flood') || text.contains('rain')) {
+    return Icons.flood_rounded;
+  }
+  if (text.contains('accident') ||
+      text.contains('traffic') ||
+      text.contains('blocked')) {
+    return Icons.traffic_rounded;
+  }
+  if (text.contains('heat')) return Icons.thermostat_rounded;
+  if (text.contains('outage') || text.contains('blackout')) {
+    return Icons.power_off_rounded;
+  }
+  if (text.contains('fire')) return Icons.local_fire_department_rounded;
+  return Icons.campaign_rounded;
+}
+
+Color _socialColor(String keyword) {
+  final text = keyword.toLowerCase();
+  if (text.contains('flood') || text.contains('rain')) {
+    return const Color(0xFF2563EB);
+  }
+  if (text.contains('accident') ||
+      text.contains('traffic') ||
+      text.contains('blocked')) {
+    return const Color(0xFFF97316);
+  }
+  if (text.contains('heat')) return const Color(0xFF14B8A6);
+  if (text.contains('outage') || text.contains('blackout')) {
+    return const Color(0xFFF59E0B);
+  }
+  if (text.contains('fire')) return const Color(0xFFEF4444);
+  return const Color(0xFF4F46E5);
+}

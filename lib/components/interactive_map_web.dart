@@ -19,10 +19,14 @@ Widget createInteractiveMap({
   bool showRiskZone = false,
   bool showAltRoute = false,
   int recenterSignal = 0,
+  double? mapCenterLatitude,
+  double? mapCenterLongitude,
 }) {
   final url = _embedUrl(
     latitude: latitude,
     longitude: longitude,
+    mapCenterLatitude: mapCenterLatitude,
+    mapCenterLongitude: mapCenterLongitude,
     zoom: zoom,
     selectedLayer: selectedLayer,
   );
@@ -47,7 +51,9 @@ Widget createInteractiveMap({
       Positioned(
         top: 12,
         left: 12,
-        child: _MapBadge(label: '${_label(latitude, longitude)} • $selectedLayer'),
+        child: _MapBadge(
+          label: '${_label(latitude, longitude)} • $selectedLayer',
+        ),
       ),
     ],
   );
@@ -56,14 +62,30 @@ Widget createInteractiveMap({
 String _embedUrl({
   required double latitude,
   required double longitude,
+  double? mapCenterLatitude,
+  double? mapCenterLongitude,
   required int zoom,
   required String selectedLayer,
 }) {
-  final query = Uri.encodeComponent(_query(latitude, longitude, selectedLayer));
+  final query = Uri.encodeComponent(
+    _query(
+      latitude,
+      longitude,
+      selectedLayer,
+      mapCenterLatitude: mapCenterLatitude,
+      mapCenterLongitude: mapCenterLongitude,
+    ),
+  );
   return 'https://www.google.com/maps?q=$query&z=$zoom&output=embed';
 }
 
-String _query(double latitude, double longitude, String selectedLayer) {
+String _query(
+  double latitude,
+  double longitude,
+  String selectedLayer, {
+  double? mapCenterLatitude,
+  double? mapCenterLongitude,
+}) {
   final isG10 =
       (latitude - 33.6946).abs() < 0.03 && (longitude - 73.0179).abs() < 0.03;
   if (isG10) {
@@ -76,7 +98,25 @@ String _query(double latitude, double longitude, String selectedLayer) {
     };
   }
   final crisis = ScenarioEngine.instance.activeCrisis;
-  final loc = crisis.location.isNotEmpty ? crisis.location : '$latitude,$longitude';
+  final loc = crisis.location.isNotEmpty
+      ? crisis.location
+      : '$latitude,$longitude';
+  if (mapCenterLatitude != null && mapCenterLongitude != null) {
+    final inIslamabad =
+        (mapCenterLatitude - 33.6844).abs() < 0.05 &&
+        (mapCenterLongitude - 73.0479).abs() < 0.05;
+    if (inIslamabad) {
+      return switch (selectedLayer) {
+        'Traffic' => 'traffic in Islamabad Pakistan near $loc',
+        'Flood Risk' =>
+          'drainage nullah streams canals Islamabad Pakistan near $loc',
+        'Shelters' =>
+          'hospitals shelters rescue centers Islamabad Pakistan near $loc',
+        'Units' => 'rescue fire police stations Islamabad Pakistan near $loc',
+        _ => 'Islamabad Pakistan near $latitude,$longitude',
+      };
+    }
+  }
   return switch (selectedLayer) {
     'Traffic' => 'traffic near $loc',
     'Flood Risk' => 'drainage nullah streams canals near $loc',

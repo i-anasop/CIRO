@@ -16,11 +16,11 @@ import '../models/simulation_result.dart';
 import '../models/signal.dart';
 import '../models/weather_result.dart';
 import '../models/route_result.dart';
+import '../models/social_post_signal.dart';
 import '../models/orchestration_models.dart';
 import '../agents/agent_pipeline.dart';
-import '../agents/gemini_agent_pipeline.dart';
+import '../agents/ai_agent_pipeline.dart';
 import '../services/groq_service.dart';
-import '../services/gemini_service.dart';
 import '../services/real_signal_service.dart';
 import '../services/notification_service.dart';
 import '../services/location_service.dart';
@@ -36,15 +36,18 @@ class ScenarioEngine extends ChangeNotifier {
   late PipelineResult _currentResult;
   String _activeScenarioId = 'SCN-001';
   bool _isRunning = false;
-  bool _isGeminiActive = false;
+  bool _isAiActive = false;
   bool _isUsingFallback = false;
   final List<String> _internalDebugLogs = [];
   CrisisType? _injectedRealCrisisType;
+  RealSignalBundle? _lastRealBundle;
 
-  bool get isGeminiActive => _isGeminiActive;
+  bool get isAiActive => _isAiActive;
   bool get isUsingFallback => _isUsingFallback;
   List<String> get internalDebugLogs => _internalDebugLogs;
   CrisisType? get injectedRealCrisisType => _injectedRealCrisisType;
+  List<SocialPostSignal> get latestSocialPosts =>
+      _lastRealBundle?.socialPosts ?? const [];
 
   void setInjectedRealCrisisType(CrisisType? type) {
     if (_injectedRealCrisisType == type) return;
@@ -73,19 +76,21 @@ class ScenarioEngine extends ChangeNotifier {
 
   // ── Public getters ────────────────────────────────────────────────────────
   PipelineResult get currentResult => _currentResult;
-  DemoScenario   get activeScenario => _currentResult.scenario;
-  Crisis         get activeCrisis   => _currentResult.crisis;
-  String         get activeScenarioId => _activeScenarioId;
-  bool           get isRunning      => _isRunning;
+  DemoScenario get activeScenario => _currentResult.scenario;
+  Crisis get activeCrisis => _currentResult.crisis;
+  String get activeScenarioId => _activeScenarioId;
+  bool get isRunning => _isRunning;
 
-  List<PlanAction>      get responsePlan => _currentResult.responsePlan;
-  SimulationResult      get simulation   => _currentResult.simulation;
-  List<AgentLog>        get agentLogs    => _currentResult.agentLogs;
-  ResourceAllocation    get resources    => _currentResult.resources;
-  VerificationDecision  get verification => _currentResult.verification;
-  List<String>          get fusionPoints => _currentResult.fusionPoints;
-  List<StakeholderNotification> get stakeholderNotifications => _currentResult.stakeholderNotifications;
-  List<AntigravityTraceEvent> get antigravityTrace => _currentResult.antigravityTrace;
+  List<PlanAction> get responsePlan => _currentResult.responsePlan;
+  SimulationResult get simulation => _currentResult.simulation;
+  List<AgentLog> get agentLogs => _currentResult.agentLogs;
+  ResourceAllocation get resources => _currentResult.resources;
+  VerificationDecision get verification => _currentResult.verification;
+  List<String> get fusionPoints => _currentResult.fusionPoints;
+  List<StakeholderNotification> get stakeholderNotifications =>
+      _currentResult.stakeholderNotifications;
+  List<AntigravityTraceEvent> get antigravityTrace =>
+      _currentResult.antigravityTrace;
 
   List<DemoScenario> get allScenarios => mockDemoScenarios;
 
@@ -99,8 +104,8 @@ class ScenarioEngine extends ChangeNotifier {
     await Future.delayed(const Duration(milliseconds: 800));
 
     _activeScenarioId = id;
-    _currentResult    = _runPipeline(scenarioById(id));
-    _isRunning        = false;
+    _currentResult = _runPipeline(scenarioById(id));
+    _isRunning = false;
     notifyListeners();
   }
 
@@ -111,13 +116,13 @@ class ScenarioEngine extends ChangeNotifier {
   // ── Pipeline orchestration ────────────────────────────────────────────────
   PipelineResult _runPipeline(DemoScenario scenario) {
     // Run all 9 agents in sequence
-    final crisis       = runDetectionAgent(scenario);
-    final fusionPts    = runFusionAgent(scenario);
-    final resources    = runResourceAgent(scenario);
-    final plan         = runResponsePlannerAgent(scenario);
-    final simulation   = runSimulationAgent(scenario);
+    final crisis = runDetectionAgent(scenario);
+    final fusionPts = runFusionAgent(scenario);
+    final resources = runResourceAgent(scenario);
+    final plan = runResponsePlannerAgent(scenario);
+    final simulation = runSimulationAgent(scenario);
     final verification = runVerificationAgent(scenario);
-    final logs         = runLogAgent(scenario, crisis);
+    final logs = runLogAgent(scenario, crisis);
     final signalAssessments = runSignalAssessmentAgent(scenario);
     final evolution = runEvolutionAgent(scenario);
     final resourceDecisions = runResourceDecisionAgent(scenario);
@@ -131,21 +136,21 @@ class ScenarioEngine extends ChangeNotifier {
     );
 
     return PipelineResult(
-      scenario:     scenario,
-      crisis:       crisis,
+      scenario: scenario,
+      crisis: crisis,
       fusionPoints: fusionPts,
-      resources:    resources,
+      resources: resources,
       responsePlan: plan,
-      simulation:   simulation,
+      simulation: simulation,
       verification: verification,
-      agentLogs:    logs,
+      agentLogs: logs,
       signalAssessments: signalAssessments,
       evolution: evolution,
       resourceDecisions: resourceDecisions,
       stakeholderNotifications: notifications,
       coordination: coordination,
       antigravityTrace: antigravityTrace,
-      generatedAt:  DateTime.now(),
+      generatedAt: DateTime.now(),
     );
   }
 
@@ -156,7 +161,9 @@ class ScenarioEngine extends ChangeNotifier {
       title: oldScenario.title,
       crisisType: oldScenario.crisisType,
       location: newLocation,
-      coordinates: lat != null && lng != null ? '$lat,$lng' : oldScenario.coordinates,
+      coordinates: lat != null && lng != null
+          ? '$lat,$lng'
+          : oldScenario.coordinates,
       severity: oldScenario.severity,
       confidence: oldScenario.confidence,
       status: oldScenario.status,
@@ -167,16 +174,20 @@ class ScenarioEngine extends ChangeNotifier {
       weatherSignal: oldScenario.weatherSignal,
       trafficSignal: oldScenario.trafficSignal,
       extraSignals: oldScenario.extraSignals,
-      responseActions: oldScenario.responseActions.map((action) => PlanAction(
-        step: action.step,
-        title: action.title.replaceAll('G-10', newLocation),
-        description: action.description.replaceAll('G-10', newLocation),
-        department: action.department,
-        priority: action.priority,
-        eta: action.eta,
-        status: action.status,
-        resultSummary: action.resultSummary,
-      )).toList(),
+      responseActions: oldScenario.responseActions
+          .map(
+            (action) => PlanAction(
+              step: action.step,
+              title: action.title.replaceAll('G-10', newLocation),
+              description: action.description.replaceAll('G-10', newLocation),
+              department: action.department,
+              priority: action.priority,
+              eta: action.eta,
+              status: action.status,
+              resultSummary: action.resultSummary,
+            ),
+          )
+          .toList(),
       simulationMetrics: oldScenario.simulationMetrics,
       possibleSideEffects: oldScenario.possibleSideEffects,
       verificationType: oldScenario.verificationType,
@@ -195,7 +206,7 @@ class ScenarioEngine extends ChangeNotifier {
 
   /// Resets the engine state to a pristine signal monitoring baseline.
   void resetRealAnalysis() {
-    _isGeminiActive = false;
+    _isAiActive = false;
     _isUsingFallback = false;
     _internalDebugLogs.clear();
     final pristineScenario = DemoScenario(
@@ -209,10 +220,23 @@ class ScenarioEngine extends ChangeNotifier {
       status: CrisisStatus.monitoring,
       affectedPopulation: 0,
       expectedDuration: '-',
-      likelyEvolution: 'Continuous scan active. Awaiting location detection to fetch local signals.',
-      socialSignal: const SignalInput(source: SignalSource.socialPost, content: 'Signal feed: Monitoring', confidence: 1.0),
-      weatherSignal: const SignalInput(source: SignalSource.weatherAlert, content: 'Weather feed: Monitoring', confidence: 1.0),
-      trafficSignal: const SignalInput(source: SignalSource.trafficData, content: 'Traffic feed: Monitoring', confidence: 1.0),
+      likelyEvolution:
+          'Continuous scan active. Awaiting location detection to fetch local signals.',
+      socialSignal: const SignalInput(
+        source: SignalSource.socialPost,
+        content: 'Signal feed: Monitoring',
+        confidence: 1.0,
+      ),
+      weatherSignal: const SignalInput(
+        source: SignalSource.weatherAlert,
+        content: 'Weather feed: Monitoring',
+        confidence: 1.0,
+      ),
+      trafficSignal: const SignalInput(
+        source: SignalSource.trafficData,
+        content: 'Traffic feed: Monitoring',
+        confidence: 1.0,
+      ),
       extraSignals: const [],
       responseActions: const [],
       simulationMetrics: const [],
@@ -227,7 +251,8 @@ class ScenarioEngine extends ChangeNotifier {
         peakImpactTime: 'None',
         spreadRisk: 'No spread risk while monitoring',
         uncertaintyRange: '+/- 5%',
-        fallbackMode: 'Degraded monitoring baseline. Missing APIs do not block demo mode.',
+        fallbackMode:
+            'Degraded monitoring baseline. Missing APIs do not block demo mode.',
       ),
     );
     _activeScenarioId = 'SCN-REAL';
@@ -236,20 +261,22 @@ class ScenarioEngine extends ChangeNotifier {
   }
 
   /// Triggers a live signal analysis by fetching GPS, reverse geocoding, querying APIs,
-  /// and running the Gemini AI agent pipeline (or deterministic fallback).
-  Future<void> runRealSignalAnalysis({double? latitude, double? longitude, String? area}) async {
+  /// and running the Groq AI agent pipeline (or deterministic fallback).
+  Future<void> runRealSignalAnalysis({
+    double? latitude,
+    double? longitude,
+    String? area,
+  }) async {
     _isRunning = true;
     notifyListeners();
 
     try {
       _internalDebugLogs.clear();
       GroqService.instance.resetLastCallStatus();
-      GeminiService.instance.resetLastCallStatus();
 
-      // Check key configuration — Groq first, then Gemini
-      final hasGroq   = AppConfig.instance.hasGroqKey;
-      final hasGemini = AppConfig.instance.hasGeminiKey;
-      _internalDebugLogs.add('Groq key: ${hasGroq ? "yes" : "no"} | Gemini key: ${hasGemini ? "yes" : "no"}');
+      // Check key configuration — Groq
+      final hasGroq = AppConfig.instance.hasGroqKey;
+      _internalDebugLogs.add('Groq key: ${hasGroq ? "yes" : "no"}');
 
       double? lat = latitude;
       double? lng = longitude;
@@ -265,10 +292,11 @@ class ScenarioEngine extends ChangeNotifier {
         latitude: lat,
         longitude: lng,
       );
+      _lastRealBundle = bundle;
 
       _activeScenarioId = 'SCN-REAL';
 
-      // 2. Health-check: Groq first, then Gemini, then local fallback
+      // 2. Health-check: Groq, then local fallback
       bool aiWorks = false;
 
       if (hasGroq) {
@@ -276,53 +304,45 @@ class ScenarioEngine extends ChangeNotifier {
         final testResult = await GroqService.instance.generateText('Ping');
         if (testResult != null && GroqService.instance.lastCallSucceeded) {
           aiWorks = true;
-          _isGeminiActive = true;   // reusing flag — means "AI is active"
+          _isAiActive = true; // reusing flag — means "AI is active"
           _isUsingFallback = false;
-          _internalDebugLogs.add('Groq test passed ✓ — Llama 3.3 pipeline active');
+          _internalDebugLogs.add(
+            'Groq test passed ✓ — Llama 3.3 pipeline active',
+          );
         } else {
-          _internalDebugLogs.add('Groq test failed — trying Gemini...');
+          _internalDebugLogs.add('Groq test failed - local fallback activated');
         }
       }
 
-      if (!aiWorks && hasGemini) {
-        _internalDebugLogs.add('Testing Gemini connection...');
-        final testResult = await GeminiService.instance.generateText('Ping');
-        if (testResult != null && GeminiService.instance.lastCallSucceeded) {
-          aiWorks = true;
-          _isGeminiActive = true;
-          _isUsingFallback = false;
-          _internalDebugLogs.add('Gemini test passed ✓ — Gemini 2.0 Flash pipeline active');
-        } else {
-          _isGeminiActive = false;
-          _isUsingFallback = true;
-          _internalDebugLogs.add('Gemini test failed — local fallback activated');
-        }
-      }
-
-      if (!aiWorks && !hasGroq && !hasGemini) {
-        _isGeminiActive = false;
+      if (!aiWorks) {
+        _isAiActive = false;
         _isUsingFallback = true;
-        _internalDebugLogs.add('No AI keys configured — local fallback activated');
+        if (!hasGroq) {
+          _internalDebugLogs.add(
+            'No Groq key configured - local fallback activated',
+          );
+        }
       }
 
       // 3. Route to AI pipeline if working, else Local Agentic Fallback
       if (aiWorks) {
-        final engineLabel = hasGroq ? 'Groq' : 'Gemini';
-        debugPrint('[ScenarioEngine] Running $engineLabel AI pipeline...');
-        _currentResult = await GeminiAgentPipeline.run(bundle);
-        debugPrint('[ScenarioEngine] $engineLabel AI pipeline complete.');
+        debugPrint('[ScenarioEngine] Running Groq AI pipeline...');
+        _currentResult = await AiAgentPipeline.run(bundle);
+        debugPrint('[ScenarioEngine] Groq AI pipeline complete.');
 
         // Double-check in case any sub-agent failed during run
-        final stillWorking = hasGroq
-            ? GroqService.instance.lastCallSucceeded
-            : GeminiService.instance.lastCallSucceeded;
+        final stillWorking = GroqService.instance.lastCallSucceeded;
         if (!stillWorking) {
-          _isGeminiActive = false;
+          _isAiActive = false;
           _isUsingFallback = true;
-          _internalDebugLogs.add('AI sub-agent failed during run — fallback active next cycle');
+          _internalDebugLogs.add(
+            'AI sub-agent failed during run — fallback active next cycle',
+          );
         }
       } else {
-        debugPrint('[ScenarioEngine] AI unavailable — using Local Agentic Fallback Mode.');
+        debugPrint(
+          '[ScenarioEngine] AI unavailable — using Local Agentic Fallback Mode.',
+        );
         final scenario = _toDemoScenario(bundle);
         _currentResult = _runPipeline(scenario);
       }
@@ -687,23 +707,31 @@ class ScenarioEngine extends ChangeNotifier {
     // 1. Analysis complete notification
     NotificationService.instance.addNotification(
       title: 'CIRO Analysis Complete',
-      details: 'Signal integration completed for ${bundle.location.displayLabel}. Fused ${bundle.signalCount} active signals from Weather, Routes, and News APIs.',
+      details:
+          'Signal integration completed for ${bundle.location.displayLabel}. Fused ${bundle.signalCount} active signals from Weather, Routes, and News APIs.',
     );
 
     // 2. High severity weather alert (rain/flood)
     final weather = bundle.weather;
     if (weather != null && weather.isSuccess) {
-      if (weather.alertLevel == WeatherRisk.heavyRain || weather.alertLevel == WeatherRisk.floodRisk || weather.rainfallLastHour > 15.0) {
+      if (weather.alertLevel == WeatherRisk.heavyRain ||
+          weather.alertLevel == WeatherRisk.floodRisk ||
+          weather.rainfallLastHour > 15.0) {
         NotificationService.instance.addNotification(
-          title: '🚨 CRITICAL: Heavy Rainfall Warning',
-          details: 'OpenWeather reports extreme precipitation (${weather.rainfallLabel}) in ${bundle.location.city}. Elevated risk of urban flooding and drainage capacity failure within 1-2 hours.',
+          title: 'Critical Rainfall Warning',
+          details:
+              'OpenWeather reports ${weather.rainfallLabel} in ${bundle.location.city}. CIRO is watching for urban flooding and drainage overload.',
+          showSystem: true,
         );
       }
       // 2b. Heatwave alert
-      if (weather.alertLevel == WeatherRisk.heatwave || weather.temperature >= 42) {
+      if (weather.alertLevel == WeatherRisk.heatwave ||
+          weather.temperature >= 42) {
         NotificationService.instance.addNotification(
-          title: '🚨 CRITICAL: Heatwave Alert',
-          details: 'Temperature ${weather.temperatureLabel} (feels like ${weather.feelsLikeLabel}) in ${bundle.location.city}. Health advisory: seek shade, stay hydrated, avoid outdoor activity.',
+          title: 'Critical Heatwave Alert',
+          details:
+              'Temperature is ${weather.temperatureLabel}, feels like ${weather.feelsLikeLabel}. Stay hydrated and avoid direct outdoor exposure.',
+          showSystem: true,
         );
       }
     }
@@ -711,19 +739,25 @@ class ScenarioEngine extends ChangeNotifier {
     // 3. Severe traffic blockage alert
     final traffic = bundle.traffic;
     if (traffic != null && traffic.isSuccess) {
-      if (traffic.congestionLevel == CongestionLevel.high || traffic.delayRatio > 1.4) {
+      if (traffic.congestionLevel == CongestionLevel.high ||
+          traffic.delayRatio > 1.4) {
         NotificationService.instance.addNotification(
-          title: '🚨 HIGH: Severe Traffic Blockage',
-          details: 'Google Maps Routes reports heavy traffic and slowdowns near ${bundle.location.area}. Expected delays up to ${traffic.trafficDurationMinutes - traffic.normalDurationMinutes} minutes. Alternate routing advised.',
+          title: 'High Traffic Blockage',
+          details:
+              'Google Routes reports heavy slowdowns near ${bundle.location.area}. Alternate routing is recommended.',
+          showSystem: true,
         );
       }
     }
 
     // 4. High/Critical severity crisis detected
-    if (_currentResult.crisis.severity == SeverityLevel.high || _currentResult.crisis.severity == SeverityLevel.critical) {
+    if (_currentResult.crisis.severity == SeverityLevel.high ||
+        _currentResult.crisis.severity == SeverityLevel.critical) {
       NotificationService.instance.addNotification(
-        title: '🚨 Verified Incident: ${_currentResult.crisis.title}',
-        details: 'Multi-agent correlation confirms an active ${_classificationLabel(_currentResult.crisis.type)} crisis at ${_currentResult.crisis.location}. Recommended safety protocols activated.',
+        title: 'Verified Incident: ${_currentResult.crisis.title}',
+        details:
+            'CIRO confirms an active ${_classificationLabel(_currentResult.crisis.type)} crisis at ${_currentResult.crisis.location}. Response guidance is ready.',
+        showSystem: true,
       );
     }
 
@@ -731,19 +765,25 @@ class ScenarioEngine extends ChangeNotifier {
     if (_currentResult.verification.type == VerificationType.confirmed) {
       NotificationService.instance.addNotificationWithId(
         id: 'VERIFIED-${DateTime.now().millisecondsSinceEpoch}',
-        title: '✅ Crisis Confirmed by AI Verification',
-        details: '${_currentResult.verification.label}: ${_currentResult.verification.note}',
+        title: 'Crisis Confirmed by Verification',
+        details:
+            '${_currentResult.verification.label}: ${_currentResult.verification.note}',
       );
     }
   }
 
   String _classificationLabel(CrisisType t) {
     switch (t) {
-      case CrisisType.urbanFlooding: return 'Urban Flooding';
-      case CrisisType.roadBlockage:  return 'Road Blockage';
-      case CrisisType.accident:      return 'Accident';
-      case CrisisType.heatwave:      return 'Heatwave';
-      case CrisisType.powerOutage:   return 'Power Outage';
+      case CrisisType.urbanFlooding:
+        return 'Urban Flooding';
+      case CrisisType.roadBlockage:
+        return 'Road Blockage';
+      case CrisisType.accident:
+        return 'Accident';
+      case CrisisType.heatwave:
+        return 'Heatwave';
+      case CrisisType.powerOutage:
+        return 'Power Outage';
     }
   }
 }

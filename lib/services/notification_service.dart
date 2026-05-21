@@ -11,32 +11,27 @@ class NotificationService extends ChangeNotifier {
 
   static const AndroidNotificationChannel _androidChannel =
       AndroidNotificationChannel(
-    'ciro_alerts',
-    'CIRO Alerts',
-    description: 'Crisis intelligence alerts and operational updates.',
-    importance: Importance.high,
-  );
+        'ciro_alerts',
+        'CIRO Alerts',
+        description: 'Crisis intelligence alerts and operational updates.',
+        importance: Importance.high,
+      );
 
   final List<Map<String, dynamic>> _notifications = [
     {
-      'id': '1',
-      'title': 'Heavy Rainfall Alert (Islamabad)',
-      'details': 'Red Category alert issued by Weather Agent. Expected drainage capacity peak at G-10 Markaz within 30 minutes. Emergency pumps dispatched.',
-      'time': '14:32 PKT',
+      'id': 'welcome-ciro',
+      'title': 'Welcome to CIRO',
+      'details':
+          'Your crisis command center is ready. CIRO will place important local alerts, verification updates, and response notices here.',
+      'time': 'Now',
       'isRead': false,
     },
     {
-      'id': '2',
-      'title': 'Traffic Congestion Spike (G-10)',
-      'details': 'Traffic Agent detected 85% route blockage near double road intersection. Traffic rerouted via alternate I-8 sector highway link.',
-      'time': '14:28 PKT',
-      'isRead': false,
-    },
-    {
-      'id': '3',
-      'title': 'Verified Incident: Urban Flooding',
-      'details': 'Social Post corroboration received from Islamabad citizen report: "G-10 mein paani bhar gaya hai, gaariyan phans gayi hain". Onset confirmed.',
-      'time': '14:15 PKT',
+      'id': 'complete-profile',
+      'title': 'Complete Your Profile',
+      'details':
+          'Add your name and profile picture so crisis reports and comments show your identity clearly.',
+      'time': 'Now',
       'isRead': false,
     },
   ];
@@ -45,8 +40,7 @@ class NotificationService extends ChangeNotifier {
 
   int get unreadCount => _notifications.where((n) => !n['isRead']).length;
 
-  bool hasNotification(String id) =>
-      _notifications.any((n) => n['id'] == id);
+  bool hasNotification(String id) => _notifications.any((n) => n['id'] == id);
 
   void markAsRead(String id) {
     final index = _notifications.indexWhere((n) => n['id'] == id);
@@ -83,7 +77,8 @@ class NotificationService extends ChangeNotifier {
 
     await _plugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(_androidChannel);
 
     _systemNotificationsReady = true;
@@ -100,22 +95,29 @@ class NotificationService extends ChangeNotifier {
 
     await _plugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.requestNotificationsPermission();
 
     await _plugin
         .resolvePlatformSpecificImplementation<
-            IOSFlutterLocalNotificationsPlugin>()
+          IOSFlutterLocalNotificationsPlugin
+        >()
         ?.requestPermissions(alert: true, badge: true, sound: true);
 
     await _plugin
         .resolvePlatformSpecificImplementation<
-            MacOSFlutterLocalNotificationsPlugin>()
+          MacOSFlutterLocalNotificationsPlugin
+        >()
         ?.requestPermissions(alert: true, badge: true, sound: true);
   }
 
   /// Append a new alert message to the reactive system alerts hub list.
-  void addNotification({required String title, required String details}) {
+  void addNotification({
+    required String title,
+    required String details,
+    bool showSystem = false,
+  }) {
     final now = DateTime.now();
     final hour = now.hour.toString().padLeft(2, '0');
     final min = now.minute.toString().padLeft(2, '0');
@@ -129,17 +131,20 @@ class NotificationService extends ChangeNotifier {
       'isRead': false,
     });
     notifyListeners();
-    _showSystemNotification(
-      id: now.millisecondsSinceEpoch.remainder(2147483647),
-      title: title,
-      details: details,
-    );
+    if (showSystem) {
+      _showSystemNotification(
+        id: now.millisecondsSinceEpoch.remainder(2147483647),
+        title: title,
+        details: details,
+      );
+    }
   }
 
   void addNotificationWithId({
     required String id,
     required String title,
     required String details,
+    bool showSystem = false,
   }) {
     if (hasNotification(id)) return;
     final now = DateTime.now();
@@ -155,11 +160,13 @@ class NotificationService extends ChangeNotifier {
       'isRead': false,
     });
     notifyListeners();
-    _showSystemNotification(
-      id: id.hashCode.abs().remainder(2147483647),
-      title: title,
-      details: details,
-    );
+    if (showSystem) {
+      _showSystemNotification(
+        id: id.hashCode.abs().remainder(2147483647),
+        title: title,
+        details: details,
+      );
+    }
   }
 
   Future<void> _showSystemNotification({
@@ -174,7 +181,7 @@ class NotificationService extends ChangeNotifier {
       id: id,
       title: title,
       body: details,
-      notificationDetails: const NotificationDetails(
+      notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           'ciro_alerts',
           'CIRO Alerts',
@@ -184,13 +191,15 @@ class NotificationService extends ChangeNotifier {
           priority: Priority.high,
           ticker: 'CIRO alert',
           icon: '@mipmap/launcher_icon',
+          category: AndroidNotificationCategory.alarm,
+          styleInformation: BigTextStyleInformation(details),
         ),
-        iOS: DarwinNotificationDetails(
+        iOS: const DarwinNotificationDetails(
           presentAlert: true,
           presentBadge: true,
           presentSound: true,
         ),
-        macOS: DarwinNotificationDetails(
+        macOS: const DarwinNotificationDetails(
           presentAlert: true,
           presentBadge: true,
           presentSound: true,

@@ -9,7 +9,6 @@ import 'theme/app_theme.dart';
 import 'navigation/app_navigator.dart';
 import 'services/scenario_engine.dart';
 import 'services/app_config.dart';
-import 'services/notification_service.dart';
 import 'services/user_profile_service.dart';
 
 void main() async {
@@ -22,7 +21,6 @@ void main() async {
 
   // Initialize engine with default G-10 flooding scenario
   ScenarioEngine.instance.initialize();
-  await NotificationService.instance.initialize();
 
   runApp(const CiroApp());
 }
