@@ -280,63 +280,122 @@ class _PPState extends State<PrivacyPermissionsSheet> {
   };
 
   @override
-  Widget build(BuildContext context) => Container(
-    decoration: const BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-    ),
-    padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
-    child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _handle(),
-      _sheetTitle('Privacy & Permissions'),
-      const SizedBox(height: 6),
-      const Text('Control what CIRO can access on your device.', style: TextStyle(color: _sub, fontSize: 12)),
-      const SizedBox(height: 20),
-      ..._perms.entries.map((e) => Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+  Widget build(BuildContext context) => SafeArea(
+    top: false,
+    child: Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.88,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(
+          24,
+          16,
+          24,
+          32 + MediaQuery.of(context).padding.bottom,
         ),
-        child: Row(children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: _perms[e.key]! ? _bg : const Color(0xFFF1F5F9),
-              shape: BoxShape.circle,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _handle(),
+            _sheetTitle('Privacy & Permissions'),
+            const SizedBox(height: 6),
+            const Text(
+              'Control what CIRO can access on your device.',
+              style: TextStyle(color: _sub, fontSize: 12),
             ),
-            child: Icon(_icons[e.key], color: _perms[e.key]! ? _brand : _sub, size: 18),
-          ),
-          const SizedBox(width: 12),
-          Expanded(child: Text(e.key, style: const TextStyle(color: _title, fontSize: 13, fontWeight: FontWeight.w600))),
-          Switch(
-            value: e.value,
-            onChanged: (v) => setState(() => _perms[e.key] = v),
-            activeTrackColor: _brand,
-            activeThumbColor: Colors.white,
-            inactiveTrackColor: const Color(0xFFE2E8F0),
-            inactiveThumbColor: Colors.white,
-          ),
-        ]),
-      )),
-      const SizedBox(height: 8),
-      SizedBox(width: double.infinity, child: ElevatedButton(
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Permissions saved successfully'), backgroundColor: _brand),
-          );
-          Navigator.pop(context);
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _brand, elevation: 0,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            const SizedBox(height: 20),
+            ..._perms.entries.map(
+              (e) => Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _perms[e.key]!
+                            ? _bg
+                            : const Color(0xFFF1F5F9),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        _icons[e.key],
+                        color: _perms[e.key]! ? _brand : _sub,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        e.key,
+                        style: const TextStyle(
+                          color: _title,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Switch(
+                      value: e.value,
+                      onChanged: (v) => setState(() => _perms[e.key] = v),
+                      activeTrackColor: _brand,
+                      activeThumbColor: Colors.white,
+                      inactiveTrackColor: const Color(0xFFE2E8F0),
+                      inactiveThumbColor: Colors.white,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Permissions saved successfully'),
+                      backgroundColor: _brand,
+                    ),
+                  );
+                  Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _brand,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: const Text(
+                  'Save Permissions',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
-        child: const Text('Save Permissions', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-      )),
-    ]),
+      ),
+    ),
   );
 }
 
@@ -588,6 +647,7 @@ Widget _sectionLabel(String t) => Text(t,
 void showSettingsSheet(BuildContext context, Widget sheet) {
   showModalBottomSheet(
     context: context,
+    useRootNavigator: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (_) => sheet,
