@@ -4,8 +4,6 @@
 
 <br />
 
-<img src="https://img.shields.io/badge/CIRO-Crisis%20Intelligence%20%26%20Response%20Orchestrator-C8836A?style=for-the-badge&labelColor=0D0D0D&color=C8836A" alt="CIRO" />
-
 # CIRO
 ### Crisis Intelligence & Response Orchestrator
 
