@@ -567,52 +567,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         ),
                       ],
-                      if (!isDemo && engine.isUsingFallback) ...[
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFFBEB),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: const Color(0xFFFDE68A),
-                              width: 1,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(
-                                  0xFFB45309,
-                                ).withValues(alpha: 0.04),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: const Row(
-                            children: [
-                              Icon(
-                                Icons.cloud_off_rounded,
-                                color: Color(0xFFD97706),
-                                size: 18,
-                              ),
-                              SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  'Cloud AI temporarily unavailable. CIRO is using local real-signal analysis.',
-                                  style: TextStyle(
-                                    color: Color(0xFF92400E),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
                       if (!isDemo &&
                           crisis.status == CrisisStatus.monitoring) ...[
                         const SizedBox(height: 16),
@@ -1063,9 +1017,9 @@ class _BrandHeader extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFEF3C7),
+                    color: const Color(0xFFEFF6FF),
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: const Color(0xFFFDE68A)),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -1074,7 +1028,7 @@ class _BrandHeader extends StatelessWidget {
                         width: 6,
                         height: 6,
                         decoration: const BoxDecoration(
-                          color: Color(0xFFF59E0B),
+                          color: Color(0xFF2563EB),
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -1083,7 +1037,7 @@ class _BrandHeader extends StatelessWidget {
                         'Local Analysis Active',
                         style: TextStyle(
                           fontSize: 9,
-                          color: Color(0xFFB45309),
+                          color: Color(0xFF1D4ED8),
                           fontWeight: FontWeight.w800,
                         ),
                       ),
