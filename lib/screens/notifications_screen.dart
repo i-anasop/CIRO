@@ -35,7 +35,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             elevation: 0,
             centerTitle: true,
             leading: IconButton(
-              onPressed: () => context.pop(),
+              onPressed: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/home');
+                }
+              },
               icon: const Icon(
                 Icons.arrow_back_rounded,
                 color: Color(0xFF101828),

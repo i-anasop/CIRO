@@ -516,7 +516,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         location: isDemo ? 'G-10, Islamabad' : crisis.location,
                         onLocationTap: _showLocationPreview,
                         onNotificationsTap: () =>
-                            context.push('/notifications'),
+                            context.go('/notifications'),
                         onProfileTap: () => context.push('/profile'),
                       ),
                       const SizedBox(height: 20),
