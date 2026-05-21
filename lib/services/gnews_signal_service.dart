@@ -33,7 +33,7 @@ class GnewsSignalService {
     }
 
     // Also pull from ReliefWeb RSS (always free, UN source — great for hackathon)
-    if (results.isEmpty) {
+    if (results.isEmpty && !kIsWeb) {
       results = await _fetchFromReliefWeb(location);
     }
 
@@ -135,7 +135,9 @@ class GnewsSignalService {
       }
       return signals;
     } catch (e) {
-      debugPrint('[GnewsSignalService] ReliefWeb error: $e');
+      if (!kIsWeb) {
+        debugPrint('[GnewsSignalService] ReliefWeb error: $e');
+      }
       return [];
     }
   }

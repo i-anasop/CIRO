@@ -931,6 +931,12 @@ class _TopBar extends StatelessWidget {
                         child: Image.network(
                           profile.customAvatarUrl!,
                           fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Icon(
+                            UserProfileService.avatarIcons[
+                                profile.avatarIndex],
+                            color: Colors.white,
+                            size: 19,
+                          ),
                         ),
                       )
                     : Icon(
@@ -1966,6 +1972,9 @@ class _ReportComposer extends StatelessWidget {
                   radius: 16,
                   backgroundColor: const Color(0xFFF3E8FF),
                   backgroundImage: _getAvatarImage(profile.customAvatarUrl),
+                  onBackgroundImageError: profile.customAvatarUrl != null
+                      ? (_, __) {}
+                      : null,
                   child: profile.customAvatarUrl != null
                       ? null
                       : Icon(
@@ -2144,6 +2153,9 @@ class _ReportTileState extends State<_ReportTile> {
                     radius: 18,
                     backgroundColor: widget.color.withValues(alpha: 0.12),
                     backgroundImage: _getAvatarImage(widget.avatarImageData),
+                    onBackgroundImageError: widget.avatarImageData != null
+                        ? (_, __) {}
+                        : null,
                     child: widget.avatarImageData != null
                         ? null
                         : Icon(widget.icon, color: widget.color, size: 16),

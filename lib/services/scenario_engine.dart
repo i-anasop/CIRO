@@ -310,7 +310,12 @@ class ScenarioEngine extends ChangeNotifier {
             'Groq test passed ✓ — Llama 3.3 pipeline active',
           );
         } else {
-          _internalDebugLogs.add('Groq test failed - local fallback activated');
+          _internalDebugLogs.add(
+            GroqService.instance.isRateLimited
+                ? 'Groq is rate limited - local fallback activated'
+                : 'Groq test failed - local fallback activated',
+          );
+          _currentResult = _runPipeline(_toDemoScenario(bundle));
         }
       }
 
@@ -338,6 +343,7 @@ class ScenarioEngine extends ChangeNotifier {
           _internalDebugLogs.add(
             'AI sub-agent failed during run — fallback active next cycle',
           );
+          _currentResult = _runPipeline(_toDemoScenario(bundle));
         }
       } else {
         debugPrint(

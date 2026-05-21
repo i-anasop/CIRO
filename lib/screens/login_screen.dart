@@ -127,7 +127,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       // Update User Profile Service with google profile info
       await UserProfileService.instance.updateProfile(
         name: user.displayName ?? user.email.split('@').first,
-        role: 'Crisis Field Responder',
+        role: '',
         email: user.email,
         avatarIndex: 0,
         customAvatarUrl: googleAvatarUrl,

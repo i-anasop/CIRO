@@ -21,9 +21,16 @@ class GroqService {
   static const _primaryModel = 'llama-3.3-70b-versatile';
 
   bool _lastCallSucceeded = true;
-  bool get lastCallSucceeded => _lastCallSucceeded;
+  DateTime? _rateLimitedUntil;
+  String? _lastRateLimitMessage;
 
-  void resetLastCallStatus() => _lastCallSucceeded = true;
+  bool get lastCallSucceeded => _lastCallSucceeded;
+  bool get isRateLimited =>
+      _rateLimitedUntil != null && DateTime.now().isBefore(_rateLimitedUntil!);
+
+  void resetLastCallStatus() {
+    _lastCallSucceeded = !isRateLimited;
+  }
 
   bool get isAvailable => AppConfig.instance.hasGroqKey;
 
@@ -33,6 +40,10 @@ class GroqService {
   /// Returns null on any failure — callers must handle gracefully.
   Future<Map<String, dynamic>?> generateJson(String prompt) async {
     if (!isAvailable) {
+      _lastCallSucceeded = false;
+      return null;
+    }
+    if (isRateLimited) {
       _lastCallSucceeded = false;
       return null;
     }
@@ -67,7 +78,7 @@ class GroqService {
           .timeout(const Duration(seconds: 20));
 
       if (resp.statusCode != 200) {
-        debugPrint('[GroqService] HTTP ${resp.statusCode}: ${resp.body}');
+        _handleHttpFailure(resp.statusCode, resp.body);
         _lastCallSucceeded = false;
         return null;
       }
@@ -99,6 +110,10 @@ class GroqService {
       _lastCallSucceeded = false;
       return null;
     }
+    if (isRateLimited) {
+      _lastCallSucceeded = false;
+      return null;
+    }
 
     try {
       final body = jsonEncode({
@@ -123,6 +138,7 @@ class GroqService {
           .timeout(const Duration(seconds: 15));
 
       if (resp.statusCode != 200) {
+        _handleHttpFailure(resp.statusCode, resp.body);
         _lastCallSucceeded = false;
         return null;
       }
@@ -155,5 +171,45 @@ class GroqService {
       c = c.substring(0, c.length - 3);
     }
     return c.trim();
+  }
+
+  void _handleHttpFailure(int statusCode, String body) {
+    if (statusCode == 429) {
+      final message = _extractErrorMessage(body);
+      _rateLimitedUntil = DateTime.now().add(_parseRetryDelay(message));
+      if (_lastRateLimitMessage != message) {
+        debugPrint(
+          '[GroqService] Rate limited. Switching to local fallback. $message',
+        );
+        _lastRateLimitMessage = message;
+      }
+      return;
+    }
+    debugPrint('[GroqService] HTTP $statusCode: $body');
+  }
+
+  String _extractErrorMessage(String body) {
+    try {
+      final data = jsonDecode(body) as Map<String, dynamic>;
+      final error = data['error'];
+      if (error is Map<String, dynamic>) {
+        return error['message'] as String? ?? body;
+      }
+      return body;
+    } catch (_) {
+      return body;
+    }
+  }
+
+  Duration _parseRetryDelay(String message) {
+    final minuteMatch = RegExp(r'in\s+(\d+)m').firstMatch(message);
+    final secondMatch = RegExp(
+      r'in\s+(?:(?:\d+)m)?\s*(\d+(?:\.\d+)?)s',
+    ).firstMatch(message);
+
+    final minutes = int.tryParse(minuteMatch?.group(1) ?? '') ?? 0;
+    final seconds = double.tryParse(secondMatch?.group(1) ?? '') ?? 0;
+    final parsed = Duration(minutes: minutes, seconds: seconds.ceil());
+    return parsed > Duration.zero ? parsed : const Duration(minutes: 30);
   }
 }

@@ -69,9 +69,7 @@ class UserProfileService extends ChangeNotifier {
       avatarIcons.length - 1,
     );
     final savedAvatar = prefs.getString(_customAvatarKey);
-    _customAvatarUrl = savedAvatar == null || savedAvatar.isEmpty
-        ? null
-        : savedAvatar;
+    _customAvatarUrl = _safeAvatarData(savedAvatar);
     notifyListeners();
   }
 
@@ -86,7 +84,7 @@ class UserProfileService extends ChangeNotifier {
     _role = role.trim();
     _email = email.trim();
     _avatarIndex = avatarIndex;
-    _customAvatarUrl = customAvatarUrl;
+    _customAvatarUrl = _safeAvatarData(customAvatarUrl);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_nameKey, _name);
     await prefs.setString(_roleKey, _role);
@@ -98,5 +96,14 @@ class UserProfileService extends ChangeNotifier {
       await prefs.setString(_customAvatarKey, _customAvatarUrl!);
     }
     notifyListeners();
+  }
+
+  String? _safeAvatarData(String? value) {
+    if (value == null || value.isEmpty) return null;
+    if (value.startsWith('data:image')) return value;
+    if (value.startsWith('https://') || value.startsWith('http://')) {
+      return value;
+    }
+    return null;
   }
 }

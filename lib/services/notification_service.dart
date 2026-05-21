@@ -87,7 +87,6 @@ class NotificationService extends ChangeNotifier {
   /// Request local notification permissions.
   Future<void> requestPermissions() async {
     if (kIsWeb) {
-      debugPrint('CIRO system notifications are not available on web builds.');
       return;
     }
 

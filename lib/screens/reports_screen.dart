@@ -1037,6 +1037,10 @@ class _PostCardState extends State<_PostCard>
                     backgroundImage: _getAvatarImage(
                       widget.post.avatarImageData,
                     ),
+                    onBackgroundImageError:
+                        widget.post.avatarImageData != null
+                        ? (_, __) {}
+                        : null,
                     child: widget.post.avatarImageData != null
                         ? null
                         : Icon(
@@ -1582,6 +1586,7 @@ class _ProfileAvatar extends StatelessWidget {
       radius: radius,
       backgroundColor: color.withValues(alpha: 0.12),
       backgroundImage: _getAvatarImage(image),
+      onBackgroundImageError: image != null ? (_, __) {} : null,
       child: image != null
           ? null
           : Icon(icon, color: color, size: radius * 0.92),
