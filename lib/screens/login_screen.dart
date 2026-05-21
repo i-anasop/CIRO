@@ -85,6 +85,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     if (envVal != null && envVal.trim().isNotEmpty) {
       return envVal.trim();
     }
+    // Fallback to null (which triggers prompt for configuration if env fails)
     return null;
   }
 

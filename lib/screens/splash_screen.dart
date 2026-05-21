@@ -55,6 +55,12 @@ class _SplashScreenState extends State<SplashScreen>
     _initializeApp();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    precacheImage(const AssetImage('assets/logo.png'), context);
+  }
+
   Future<void> _initializeApp() async {
     final startTime = DateTime.now();
 
@@ -221,6 +227,7 @@ class _SplashScreenState extends State<SplashScreen>
     return Container(
       width: 110, height: 110,
       decoration: BoxDecoration(
+        color: CiroColors.bg4,
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
@@ -230,7 +237,18 @@ class _SplashScreenState extends State<SplashScreen>
         ],
       ),
       child: ClipOval(
-        child: Image.asset('assets/logo.png', fit: BoxFit.cover),
+        child: Image.asset(
+          'assets/logo.png',
+          fit: BoxFit.cover,
+          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+            if (wasSynchronouslyLoaded) return child;
+            return AnimatedOpacity(
+              opacity: frame == null ? 0 : 1,
+              duration: const Duration(milliseconds: 300),
+              child: child,
+            );
+          },
+        ),
       ),
     );
   }

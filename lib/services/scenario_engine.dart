@@ -58,20 +58,23 @@ class ScenarioEngine extends ChangeNotifier {
     if (_injectedRealCrisisType == type) return;
     _injectedRealCrisisType = type;
     notifyListeners();
-    // Re-run real signal analysis if in Real Mode (SCN-REAL)
-    if (_activeScenarioId == 'SCN-REAL') {
-      final loc = _currentResult.scenario.coordinates;
-      double? lat;
-      double? lng;
-      try {
-        final parts = loc.split(',');
-        if (parts.length == 2) {
-          lat = double.parse(parts[0].trim());
-          lng = double.parse(parts[1].trim());
-        }
-      } catch (_) {}
-      runRealSignalAnalysis(latitude: lat, longitude: lng);
-    }
+    // Clear cache first to prevent stale simulation signals when changing or disabling threats
+    SignalCacheService.instance.clearCache().then((_) {
+      // Re-run real signal analysis if in Real Mode (SCN-REAL)
+      if (_activeScenarioId == 'SCN-REAL') {
+        final loc = _currentResult.scenario.coordinates;
+        double? lat;
+        double? lng;
+        try {
+          final parts = loc.split(',');
+          if (parts.length == 2) {
+            lat = double.parse(parts[0].trim());
+            lng = double.parse(parts[1].trim());
+          }
+        } catch (_) {}
+        runRealSignalAnalysis(latitude: lat, longitude: lng);
+      }
+    });
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────

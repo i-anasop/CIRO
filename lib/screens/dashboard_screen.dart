@@ -674,7 +674,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ],
                           ),
                         ),
-                      ] else if (isDemo) ...[
+                      ] else ...[
                         const SizedBox(height: 16),
                         _ActiveRiskCard(
                           crisis: crisis,

@@ -161,8 +161,6 @@ class _LocationScreenState extends State<LocationScreen>
           SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final bool useScroll = constraints.maxHeight < 620;
-
                 final content = Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
@@ -428,19 +426,15 @@ class _LocationScreenState extends State<LocationScreen>
                   ),
                 );
 
-                if (useScroll) {
-                  return SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight,
-                      ),
-                      child: content,
+                return SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
                     ),
-                  );
-                }
-
-                return content;
+                    child: content,
+                  ),
+                );
               },
             ),
           ),

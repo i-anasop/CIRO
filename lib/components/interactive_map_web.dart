@@ -10,6 +10,7 @@ import '../theme/colors.dart';
 import '../theme/typography.dart';
 
 final Set<String> _registeredViews = {};
+final Map<String, ValueNotifier<bool>> _mapLoadingStates = {};
 
 Widget createInteractiveMap({
   required double latitude,
@@ -32,22 +33,45 @@ Widget createInteractiveMap({
   );
   final viewId = 'ciro-google-embed-${url.hashCode}';
 
+  final notifier = _mapLoadingStates.putIfAbsent(viewId, () => ValueNotifier<bool>(true));
+
   if (!_registeredViews.contains(viewId)) {
     _registeredViews.add(viewId);
     ui_web.platformViewRegistry.registerViewFactory(viewId, (int id) {
-      return html.IFrameElement()
+      notifier.value = true;
+      final iframe = html.IFrameElement()
         ..src = url
         ..style.border = '0'
         ..style.width = '100%'
         ..style.height = '100%'
         ..allowFullscreen = false
         ..referrerPolicy = 'no-referrer-when-downgrade';
+
+      iframe.onLoad.listen((_) {
+        notifier.value = false;
+      });
+
+      // Safety timeout: if onLoad doesn't fire within 5 seconds, clear the loader
+      Future.delayed(const Duration(seconds: 5), () {
+        if (notifier.value) {
+          notifier.value = false;
+        }
+      });
+
+      return iframe;
     });
   }
 
   return Stack(
     children: [
       HtmlElementView(key: ValueKey(viewId), viewType: viewId),
+      ValueListenableBuilder<bool>(
+        valueListenable: notifier,
+        builder: (context, isLoading, child) {
+          if (!isLoading) return const SizedBox.shrink();
+          return const _MapLoadingPlaceholder();
+        },
+      ),
       Positioned(
         top: 12,
         left: 12,
@@ -157,6 +181,40 @@ class _MapBadge extends StatelessWidget {
               style: CiroTypography.labelSmall.copyWith(
                 color: CiroColors.textPrimary,
                 fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MapLoadingPlaceholder extends StatelessWidget {
+  const _MapLoadingPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFFF1F5F9), // slate-100 fallback
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                valueColor: AlwaysStoppedAnimation<Color>(CiroColors.brand),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Loading interactive map...',
+              style: CiroTypography.caption.copyWith(
+                color: CiroColors.textSecondary,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],

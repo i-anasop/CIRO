@@ -49,13 +49,16 @@ class SignalCacheService extends ChangeNotifier {
     await _persistPruned();
   }
 
+  Future<void> clearCache() async {
+    await ensureLoaded();
+    _signals.clear();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_cacheKey);
+    notifyListeners();
+  }
+
   Future<void> cacheBundle(dynamic bundle) async {
     await ensureLoaded();
-    if (bundle.warnings.any(
-      (warning) => warning.toString().contains('Simulated threat'),
-    )) {
-      return;
-    }
     final now = DateTime.now();
     final city = bundle.location.city.isNotEmpty ? bundle.location.city : 'Islamabad';
     final area = bundle.location.area;

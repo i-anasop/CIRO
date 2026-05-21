@@ -46,3 +46,7 @@ app.*.map.json
 
 # Environment variables — NEVER commit real keys
 .env
+
+# Firebase local cache
+.firebase/
+
