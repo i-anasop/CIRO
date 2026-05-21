@@ -17,6 +17,7 @@ import 'gnews_signal_service.dart';
 import 'social_signal_service.dart';
 import 'routes_service.dart';
 import 'app_config.dart';
+import 'signal_cache_service.dart';
 import '../models/crisis.dart';
 import 'scenario_engine.dart';
 
@@ -136,14 +137,24 @@ class RealSignalService {
           GnewsSignalService.instance.fetchSignals(locationQuery),
         ]).then((results) {
           final combined = <NewsSignal>[...results[0], ...results[1]];
-          // Deduplicate by title similarity
+          // Deduplicate by title/source while keeping enough real articles to
+          // populate active crisis and community feed surfaces.
           final seen = <String>{};
           return combined
               .where((s) {
-                final key = s.title.substring(0, s.title.length.clamp(0, 40));
+                final normalizedTitle = s.title
+                    .toLowerCase()
+                    .replaceAll(RegExp(r'[^a-z0-9 ]'), ' ')
+                    .replaceAll(RegExp(r'\s+'), ' ')
+                    .trim();
+                final end = normalizedTitle.length > 72
+                    ? 72
+                    : normalizedTitle.length;
+                final key =
+                    '${s.source.toLowerCase()}-${normalizedTitle.substring(0, end)}';
                 return seen.add(key);
               })
-              .take(5)
+              .take(16)
               .toList();
         });
 
@@ -372,7 +383,7 @@ class RealSignalService {
       fallbackNews: finalNews,
     );
 
-    return RealSignalBundle(
+    final bundle = RealSignalBundle(
       location: location,
       weather: finalWeather.isSuccess ? finalWeather : null,
       newsSignals: finalNews,
@@ -385,6 +396,8 @@ class RealSignalService {
           finalTraffic.isSuccess,
       warnings: warnings,
     );
+    await SignalCacheService.instance.cacheBundle(bundle);
+    return bundle;
   }
 
   /// Quick service readiness check without making real API calls.

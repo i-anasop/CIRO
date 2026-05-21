@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../models/cached_signal.dart';
+import '../models/signal.dart';
 import '../services/app_mode_service.dart';
 import '../services/location_service.dart';
 import '../services/post_database_service.dart';
@@ -1984,6 +1986,10 @@ class _FeedPost {
 
 List<_FeedPost> _seedPosts() {
   if (!AppModeService.instance.isDemoMode) {
+    final cachedSignals = ScenarioEngine.instance.rankedCachedSignals.take(20).toList();
+    if (cachedSignals.isNotEmpty) {
+      return cachedSignals.map(_feedPostFromCachedSignal).toList();
+    }
     final socialPosts = ScenarioEngine.instance.latestSocialPosts;
     if (socialPosts.isNotEmpty) {
       return socialPosts.map((post) {
@@ -2014,6 +2020,7 @@ List<_FeedPost> _seedPosts() {
         );
       }).toList();
     }
+    return const [];
   }
 
   return const [
@@ -2142,6 +2149,37 @@ List<_FeedPost> _seedPosts() {
       ],
     ),
   ];
+}
+
+_FeedPost _feedPostFromCachedSignal(CachedSignal signal) {
+  final keyword = signal.crisisTypeHint?.name ?? signal.title;
+  final color = _socialColor(keyword);
+  return _FeedPost(
+    id: signal.id,
+    author: signal.sourceName,
+    handle: '@${signal.source.name}',
+    avatarText: signal.sourceName.characters.first.toUpperCase(),
+    time: signal.freshnessLabel,
+    title: signal.title,
+    body: signal.content,
+    location: signal.locationLabel,
+    tag: signal.contributesToActiveCrisis
+        ? 'Active input'
+        : signal.freshnessLabel,
+    icon: _socialIcon(keyword),
+    color: color,
+    imageTone: color,
+    likes: (signal.rankScore / 4).round().clamp(4, 30),
+    views: (signal.rankScore * 1.4).round().clamp(18, 160),
+    isOfficial: signal.source != SignalSource.citizenReport,
+    comments: const [
+      _Comment(
+        author: 'CIRO ranking agent',
+        handle: '@ciro',
+        text: 'Ranked by severity, confidence, source strength, and freshness.',
+      ),
+    ],
+  );
 }
 
 IconData _socialIcon(String keyword) {

@@ -26,28 +26,50 @@ class GnewsSignalService {
 
   /// Fetch news using GNews API. Falls back to ReliefWeb if GNews key missing.
   Future<List<NewsSignal>> fetchSignals(String location) async {
-    List<NewsSignal> results = [];
+    final results = <NewsSignal>[];
+    final seen = <String>{};
 
     if (AppConfig.instance.hasGnewsKey) {
-      results = await _fetchFromGnews(location);
+      for (final signal in await _fetchFromGnews(location)) {
+        if (seen.add(_dedupeKey(signal))) results.add(signal);
+      }
     }
 
     // Also pull from ReliefWeb RSS (always free, UN source — great for hackathon)
-    if (results.isEmpty && !kIsWeb) {
-      results = await _fetchFromReliefWeb(location);
+    if (!kIsWeb) {
+      for (final signal in await _fetchFromReliefWeb(location)) {
+        if (seen.add(_dedupeKey(signal))) results.add(signal);
+        if (results.length >= 12) break;
+      }
     }
 
     return results;
   }
 
   Future<List<NewsSignal>> _fetchFromGnews(String location) async {
-    final keyword = _crisisKeywords.take(4).join(' OR ');
-    final query = Uri.encodeComponent('($keyword) $location');
+    final queries = _queryVariants(location);
+    final signals = <NewsSignal>[];
+    final seen = <String>{};
+
+    for (final q in queries) {
+      final fetched = await _fetchGnewsQuery(q);
+      for (final signal in fetched) {
+        final key = signal.title.toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+        if (seen.add(key)) signals.add(signal);
+        if (signals.length >= 8) return signals;
+      }
+    }
+
+    return signals;
+  }
+
+  Future<List<NewsSignal>> _fetchGnewsQuery(String queryText) async {
+    final query = Uri.encodeComponent(queryText);
     try {
       final uri = Uri.parse(
         '$_gnewsBase?q=$query'
         '&lang=en'
-        '&max=10'
+        '&max=6'
         '&sortby=publishedAt'
         '&apikey=${AppConfig.instance.gnewsApiKey}',
       );
@@ -68,6 +90,24 @@ class GnewsSignalService {
       debugPrint('[GnewsSignalService] GNews error: $e');
       return [];
     }
+  }
+
+  List<String> _queryVariants(String location) {
+    final compact = location.trim().replaceAll(RegExp(r'\s+'), ' ');
+    String? city;
+    final parts = compact
+        .split(RegExp(r'[,،]|\s+'))
+        .where((part) => part.trim().length > 2)
+        .toList();
+    if (parts.isNotEmpty) city = parts.last;
+    final cityQuery = city == null ? compact : city;
+
+    return [
+      '$compact flood OR rain OR accident OR traffic OR heatwave OR outage',
+      '$cityQuery emergency OR disaster OR traffic OR accident',
+      'Pakistan flood OR rain OR accident OR heatwave OR power outage',
+      'Pakistan emergency disaster traffic',
+    ].where((item) => item.trim().isNotEmpty).toList();
   }
 
   Future<List<NewsSignal>> _fetchFromReliefWeb(String location) async {
@@ -175,4 +215,15 @@ class GnewsSignalService {
 
   String _truncate(String s, int max) =>
       s.length > max ? '${s.substring(0, max)}…' : s;
+
+  String _dedupeKey(NewsSignal signal) {
+    final source = signal.source.toLowerCase().trim();
+    final normalizedTitle = signal.title
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9 ]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    final end = normalizedTitle.length > 72 ? 72 : normalizedTitle.length;
+    return '$source-${normalizedTitle.substring(0, end)}';
+  }
 }

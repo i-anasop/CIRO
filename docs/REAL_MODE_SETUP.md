@@ -162,23 +162,27 @@ RealSignalService (coordinator)
 | **GPS on Web** | Geolocator has limited web support — may fall back to mock coords |
 | **Routes API quota** | Free tier: 10,000 requests/month. CIRO requests 1 per analyze |
 | **OpenWeather free** | Forecast API requires paid plan. CIRO uses Current Weather (free) |
-| **No real agent pipeline** | Real Mode shows a live signal summary. The 9-agent AI pipeline runs on mock data from Demo scenarios only. Connecting real signals to the pipeline is the next development milestone. |
+| **External data gaps** | Real Mode now feeds live and cached signals into the 9-agent pipeline, but sparse APIs, missing keys, or rate limits may still reduce confidence. CIRO labels cached, derived, and fallback signals instead of hiding degraded sources. |
 
 ---
 
 ## Next Recommended Step
 
-Connect `RealSignalBundle` output to the existing agent pipeline:
+Harden the real signal loop with scheduled background refresh:
 
 ```
 RealSignalService.fetchAll()
-  → RealSignalBundle
-  → DemoScenario.fromRealBundle(bundle)    ← to be implemented
-  → AgentPipeline.run(scenario)
-  → ScenarioEngine.updateFromReal(result)
-  → All screens update reactively
+  → SignalCacheService.cacheBundle(bundle)
+  → RealScenarioAdapter.fromBundle(bundle + cached city memory)
+  → AgentPipeline / AiAgentPipeline
+  → ranked crisis feed + active crisis response
 ```
+
+Current implementation note: `RealSignalBundle` is now cached through
+`SignalCacheService`, adapted by `RealScenarioAdapter`, and consumed by the
+local or Groq-powered agent pipeline. The feed is ranked by severity,
+confidence, source strength, and freshness.
 
 ---
 
-*Last updated: 2026-05-17 | Version: 1.1.0 | Status: Real Mode Infrastructure Complete*
+*Last updated: 2026-05-21 | Version: 1.2.0 | Status: Real Mode Agent Pipeline + Signal Cache Active*

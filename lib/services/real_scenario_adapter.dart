@@ -10,6 +10,7 @@ import '../models/route_result.dart';
 import '../models/signal.dart';
 import '../models/weather_result.dart';
 import 'real_signal_service.dart';
+import 'signal_cache_service.dart';
 
 class RealScenarioAdapter {
   const RealScenarioAdapter._();
@@ -60,7 +61,10 @@ class RealScenarioAdapter {
       isActive: traffic?.isSuccess == true,
     );
 
-    final extraSignals = _derivedSignals(bundle, type, severity, active);
+    final extraSignals = [
+      ..._cachedMemorySignals(),
+      ..._derivedSignals(bundle, type, severity, active),
+    ];
     final responseActions = active
         ? _actions(type, location, affected)
         : _monitoringActions(location);
@@ -377,6 +381,18 @@ class RealScenarioAdapter {
       );
     }
     return signals;
+  }
+
+  static List<SignalInput> _cachedMemorySignals() {
+    return SignalCacheService.instance.rankedSignals.take(3).map((signal) {
+      return SignalInput(
+        source: signal.source,
+        content:
+            'CIRO memory ${signal.freshnessLabel} for ${signal.locationLabel}: ${signal.title} - ${signal.content}',
+        confidence: signal.confidence.clamp(0.35, 0.95),
+        isActive: signal.contributesToActiveCrisis,
+      );
+    }).toList();
   }
 
   static List<PlanAction> _actions(

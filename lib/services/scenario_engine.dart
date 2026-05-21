@@ -17,6 +17,7 @@ import '../models/signal.dart';
 import '../models/weather_result.dart';
 import '../models/route_result.dart';
 import '../models/social_post_signal.dart';
+import '../models/cached_signal.dart';
 import '../models/orchestration_models.dart';
 import '../agents/agent_pipeline.dart';
 import '../agents/ai_agent_pipeline.dart';
@@ -26,6 +27,7 @@ import '../services/notification_service.dart';
 import '../services/location_service.dart';
 import '../services/real_scenario_adapter.dart';
 import '../services/app_config.dart';
+import '../services/signal_cache_service.dart';
 
 class ScenarioEngine extends ChangeNotifier {
   // ── Singleton ─────────────────────────────────────────────────────────────
@@ -48,6 +50,9 @@ class ScenarioEngine extends ChangeNotifier {
   CrisisType? get injectedRealCrisisType => _injectedRealCrisisType;
   List<SocialPostSignal> get latestSocialPosts =>
       _lastRealBundle?.socialPosts ?? const [];
+  List<CachedSignal> get rankedCachedSignals =>
+      SignalCacheService.instance.rankedSignals;
+  CachedSignal? get topCachedSignal => SignalCacheService.instance.topSignal;
 
   void setInjectedRealCrisisType(CrisisType? type) {
     if (_injectedRealCrisisType == type) return;
@@ -72,6 +77,7 @@ class ScenarioEngine extends ChangeNotifier {
   // ── Init ──────────────────────────────────────────────────────────────────
   void initialize() {
     _currentResult = _runPipeline(scenarioById('SCN-001'));
+    SignalCacheService.instance.ensureLoaded().then((_) => notifyListeners());
   }
 
   // ── Public getters ────────────────────────────────────────────────────────

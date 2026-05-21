@@ -31,33 +31,66 @@ class NewsSignalService {
       return [];
     }
 
-    final keyword = _crisisKeywords.take(5).join(' OR ');
-    final query   = Uri.encodeComponent('($keyword) "$location"');
+    final signals = <NewsSignal>[];
+    final seen = <String>{};
+    for (final queryText in _queryVariants(location)) {
+      final fetched = await _fetchQuery(queryText);
+      for (final signal in fetched) {
+        final key = _dedupeKey(signal);
+        if (seen.add(key)) {
+          signals.add(signal);
+        }
+        if (signals.length >= 12) return signals;
+      }
+    }
+    return signals;
+  }
+
+  Future<List<NewsSignal>> _fetchQuery(String queryText) async {
+    final query = Uri.encodeComponent(queryText);
 
     try {
       final uri = Uri.parse(
         '$_baseUrl?q=$query'
         '&language=en'
         '&sortBy=publishedAt'
-        '&pageSize=10'
+        '&pageSize=12'
         '&apiKey=${AppConfig.instance.newsApiKey}',
       );
       final resp = await http.get(uri).timeout(const Duration(seconds: 10));
       if (resp.statusCode != 200) return [];
 
-      final data    = jsonDecode(resp.body) as Map<String, dynamic>;
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
       final articles = (data['articles'] as List<dynamic>?) ?? [];
 
-      final signals = <NewsSignal>[];
-      for (final article in articles) {
-        final signal = _toSignal(article as Map<String, dynamic>);
-        if (signal != null) signals.add(signal);
-        if (signals.length >= 5) break;
-      }
-      return signals;
+      return articles
+          .whereType<Map<String, dynamic>>()
+          .map(_toSignal)
+          .whereType<NewsSignal>()
+          .toList();
     } catch (_) {
       return [];
     }
+  }
+
+  List<String> _queryVariants(String location) {
+    final compact = location.trim().replaceAll(RegExp(r'\s+'), ' ');
+    final parts = compact
+        .split(RegExp(r'[,،]|\s+'))
+        .map((part) => part.trim())
+        .where((part) => part.length > 2)
+        .toList();
+    final city = parts.isNotEmpty ? parts.last : compact;
+    final area = parts.length > 1 ? parts.first : city;
+    final crisis = _crisisKeywords.join(' OR ');
+
+    return [
+      '($crisis) AND "$compact"',
+      '($crisis) AND "$city"',
+      '($crisis) AND Pakistan',
+      'emergency OR disaster OR flood OR accident OR heatwave OR outage Pakistan',
+      '"$area" OR "$city" emergency',
+    ].where((item) => item.trim().isNotEmpty).toList();
   }
 
   NewsSignal? _toSignal(Map<String, dynamic> a) {
@@ -101,4 +134,15 @@ class NewsSignalService {
 
   String _truncate(String s, int max) =>
       s.length > max ? '${s.substring(0, max)}…' : s;
+
+  String _dedupeKey(NewsSignal signal) {
+    final source = signal.source.toLowerCase().trim();
+    final normalizedTitle = signal.title
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9 ]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    final end = normalizedTitle.length > 72 ? 72 : normalizedTitle.length;
+    return '$source-${normalizedTitle.substring(0, end)}';
+  }
 }

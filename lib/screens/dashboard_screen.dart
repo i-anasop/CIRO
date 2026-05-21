@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../components/interactive_map_helper.dart';
 import '../components/settings_sheets.dart';
 import '../models/crisis.dart';
+import '../models/cached_signal.dart';
 import '../models/demo_scenario.dart';
 import '../models/signal.dart';
 import '../services/app_mode_service.dart';
@@ -27,31 +28,25 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  static double _savedHomeScrollOffset = 0;
-
   late final ScrollController _homeScrollController;
   bool _demoNotificationScheduled = false;
 
   @override
   void initState() {
     super.initState();
-    _homeScrollController = ScrollController(
-      initialScrollOffset: _savedHomeScrollOffset,
-    );
-    _homeScrollController.addListener(_rememberHomeScroll);
+    _homeScrollController = ScrollController();
     _scheduleDemoNotification();
   }
 
   @override
   void dispose() {
-    _homeScrollController.removeListener(_rememberHomeScroll);
     _homeScrollController.dispose();
     super.dispose();
   }
 
-  void _rememberHomeScroll() {
+  void _scrollHomeToTop() {
     if (!_homeScrollController.hasClients) return;
-    _savedHomeScrollOffset = _homeScrollController.offset;
+    _homeScrollController.jumpTo(0);
   }
 
   void _scheduleDemoNotification() {
@@ -73,8 +68,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _refreshRealMode() async {
+    _scrollHomeToTop();
     await Future.delayed(const Duration(milliseconds: 650));
     await ScenarioEngine.instance.runRealSignalAnalysis();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollHomeToTop());
   }
 
   Future<void> _handleRefresh() async {
@@ -482,6 +479,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final isDemo = AppModeService.instance.isDemoMode;
         final severity = _severityColor(crisis.severity);
         final signals = scenario.activeSignals;
+        final realCrisisSignals = isDemo
+            ? const <CachedSignal>[]
+            : engine.rankedCachedSignals
+                  .where(
+                    (signal) =>
+                        signal.crisisTypeHint != null &&
+                        signal.severityHint != SeverityLevel.low &&
+                        signal.severityHint != SeverityLevel.unknown,
+                  )
+                  .toList();
+        final topRealSignal = realCrisisSignals.isEmpty
+            ? null
+            : realCrisisSignals.first;
+        final importantRealSignals = realCrisisSignals.skip(1).take(3).toList();
+        final weatherSignal = signals
+            .where((signal) => signal.source == SignalSource.weatherAlert)
+            .cast<SignalInput?>()
+            .firstOrNull;
 
         final matchingCrises = !isDemo
             ? const <Crisis>[]
@@ -506,7 +521,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   onRefresh: _handleRefresh,
                   child: ListView(
                     controller: _homeScrollController,
-                    key: const PageStorageKey<String>('home-command-scroll'),
                     physics: const AlwaysScrollableScrollPhysics(
                       parent: BouncingScrollPhysics(),
                     ),
@@ -567,7 +581,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         ),
                       ],
-                      if (!isDemo &&
+                      if (!isDemo && topRealSignal != null) ...[
+                        const SizedBox(height: 16),
+                        _RealCrisisPrioritySection(
+                          topSignal: topRealSignal,
+                          importantSignals: importantRealSignals,
+                          onOpenTop: () => context.go(
+                            '/home/crisis-detail',
+                            extra: crisis,
+                          ),
+                          onViewAll: () => context.go('/reports'),
+                        ),
+                      ] else if (!isDemo &&
                           crisis.status == CrisisStatus.monitoring) ...[
                         const SizedBox(height: 16),
                         Container(
@@ -638,7 +663,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                               const SizedBox(height: 14),
                               const Text(
-                                'CIRO is actively monitoring real-time weather alerts, public feeds, traffic conditions, and IoT signals. All data remains within normal limits. No local crises detected.',
+                                'CIRO is monitoring real weather, news, public, and traffic sources. No fetched crisis signal is above the active-risk threshold yet.',
                                 style: TextStyle(
                                   fontSize: 12.5,
                                   color: Color(0xFF1E293B),
@@ -649,7 +674,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ],
                           ),
                         ),
-                      ] else ...[
+                      ] else if (isDemo) ...[
                         const SizedBox(height: 16),
                         _ActiveRiskCard(
                           crisis: crisis,
@@ -664,8 +689,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         signals: signals,
                         onViewReports: () => context.go('/reports'),
                       ),
-                      const SizedBox(height: 14),
-                      _GoogleWeatherCard(
+                      if (isDemo || weatherSignal != null) ...[
+                        const SizedBox(height: 14),
+                        _GoogleWeatherCard(
                         weatherSignal: signals.firstWhere(
                           (s) => s.source == SignalSource.weatherAlert,
                           orElse: () => const SignalInput(
@@ -676,10 +702,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             isActive: false,
                           ),
                         ),
-                        locationLabel: isDemo
-                            ? 'G-10, Islamabad'
-                            : crisis.location,
-                      ),
+                          locationLabel: isDemo
+                              ? 'G-10, Islamabad'
+                              : crisis.location,
+                        ),
+                      ],
                       if (matchingCrises.isNotEmpty) ...[
                         const SizedBox(height: 14),
                         Container(
@@ -1212,6 +1239,275 @@ class _ActiveRiskCard extends StatelessWidget {
   }
 }
 
+class _RealCrisisPrioritySection extends StatelessWidget {
+  final CachedSignal topSignal;
+  final List<CachedSignal> importantSignals;
+  final VoidCallback onOpenTop;
+  final VoidCallback onViewAll;
+
+  const _RealCrisisPrioritySection({
+    required this.topSignal,
+    required this.importantSignals,
+    required this.onOpenTop,
+    required this.onViewAll,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final type = topSignal.crisisTypeHint;
+    final color = _severityColor(topSignal.severityHint);
+    final label = type == null ? 'Live Crisis Signal' : _crisisTypeLabel(type);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: onOpenTop,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: color.withValues(alpha: 0.28)),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.08),
+                  blurRadius: 22,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        type == null ? _sourceIcon(topSignal.source) : _crisisIcon(type),
+                        color: Colors.white,
+                        size: 27,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'MOST CRITICAL FETCHED SIGNAL',
+                            style: TextStyle(
+                              color: color,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF111827),
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    _OutlinePill(
+                      label: topSignal.severityHint.name.toUpperCase(),
+                      color: color,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  topSignal.title,
+                  style: const TextStyle(
+                    color: Color(0xFF111827),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  topSignal.content,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF334155),
+                    fontSize: 12.5,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _TinySignalPill(
+                      icon: _sourceIcon(topSignal.source),
+                      label: topSignal.sourceName,
+                      color: color,
+                    ),
+                    _TinySignalPill(
+                      icon: Icons.verified_rounded,
+                      label: '${(topSignal.confidence * 100).round()}% confidence',
+                      color: color,
+                    ),
+                    _TinySignalPill(
+                      icon: Icons.schedule_rounded,
+                      label: topSignal.freshnessLabel,
+                      color: color,
+                    ),
+                    _TinySignalPill(
+                      icon: Icons.location_on_rounded,
+                      label: topSignal.locationLabel,
+                      color: color,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (importantSignals.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: _softBox(radius: 22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Other Active Crisis Signals',
+                        style: TextStyle(
+                          color: Color(0xFF111827),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: onViewAll,
+                      child: const Text('View all'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                ...importantSignals.map((signal) {
+                  final itemColor = _severityColor(signal.severityHint);
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: itemColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            signal.crisisTypeHint == null
+                                ? _sourceIcon(signal.source)
+                                : _crisisIcon(signal.crisisTypeHint!),
+                            color: itemColor,
+                            size: 18,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                signal.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF111827),
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${signal.sourceName} • ${signal.freshnessLabel} • ${(signal.confidence * 100).round()}%',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF64748B),
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _TinySignalPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _TinySignalPill({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 13),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SignalCards extends StatelessWidget {
   final List<SignalInput> signals;
   final VoidCallback onViewReports;
@@ -1221,6 +1517,29 @@ class _SignalCards extends StatelessWidget {
   Widget build(BuildContext context) {
     final weather = _first(SignalSource.weatherAlert);
     final traffic = _first(SignalSource.trafficData);
+    final isDemo = AppModeService.instance.isDemoMode;
+    if (!isDemo && weather == null && traffic == null) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: _softBox(radius: 18),
+        child: const Row(
+          children: [
+            Icon(Icons.sensors_rounded, color: Color(0xFF64748B), size: 20),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'No fetched weather or traffic signal yet. Pull to refresh Real Mode.',
+                style: TextStyle(
+                  color: Color(0xFF64748B),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     // Weather logic
     String weatherTitle = 'Sun';
@@ -1333,8 +1652,8 @@ class _SignalCards extends StatelessWidget {
       }
     }
 
-    return Row(
-      children: [
+    final cards = <Widget>[
+      if (isDemo || weather != null)
         Expanded(
           child: _SignalMiniCard(
             signal: weather,
@@ -1346,7 +1665,7 @@ class _SignalCards extends StatelessWidget {
             customIcon: weatherIcon,
           ),
         ),
-        const SizedBox(width: 10),
+      if (isDemo || traffic != null)
         Expanded(
           child: _SignalMiniCard(
             signal: traffic,
@@ -1358,6 +1677,14 @@ class _SignalCards extends StatelessWidget {
             customIcon: trafficIcon,
           ),
         ),
+    ];
+
+    return Row(
+      children: [
+        for (var i = 0; i < cards.length; i++) ...[
+          if (i > 0) const SizedBox(width: 10),
+          cards[i],
+        ],
       ],
     );
   }
@@ -1745,10 +2072,17 @@ class _CommunityReportsState extends State<_CommunityReports> {
     if (!AppModeService.instance.isDemoMode) {
       allReports.addAll(_realSocialReports());
     }
-    allReports.addAll(baseReports);
+    if (AppModeService.instance.isDemoMode) {
+      allReports.addAll(baseReports);
+    }
 
-    // Filter & Sort: verified/official first, then by popularity (likes + views)
+    // Ranked feed: active crisis inputs first, then verified/official, then score.
     allReports.sort((a, b) {
+      final aActive = a.tag == 'Active input' ? 1 : 0;
+      final bActive = b.tag == 'Active input' ? 1 : 0;
+      if (aActive != bActive) {
+        return bActive.compareTo(aActive);
+      }
       final aPriority = (a.isOfficial || a.tag == 'Verified') ? 1 : 0;
       final bPriority = (b.isOfficial || b.tag == 'Verified') ? 1 : 0;
       if (aPriority != bPriority) {
@@ -1826,6 +2160,24 @@ class _CommunityReportsState extends State<_CommunityReports> {
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
             )
+          else if (displayReports.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Text(
+                'No real feed items fetched yet. Refresh Real Mode or submit a local report.',
+                style: TextStyle(
+                  color: Color(0xFF64748B),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            )
           else
             ...displayReports.map(
               (report) => _ReportTile(
@@ -1850,6 +2202,10 @@ class _CommunityReportsState extends State<_CommunityReports> {
   }
 
   List<_HomeReport> _realSocialReports() {
+    final cached = ScenarioEngine.instance.rankedCachedSignals.take(8).toList();
+    if (cached.isNotEmpty) {
+      return cached.map(_homeReportFromCachedSignal).toList();
+    }
     return ScenarioEngine.instance.latestSocialPosts.map((post) {
       final color = _socialColor(post.matchedKeyword);
       return _HomeReport(
@@ -1867,6 +2223,27 @@ class _CommunityReportsState extends State<_CommunityReports> {
         isOfficial: post.verifiedSource,
       );
     }).toList();
+  }
+
+  _HomeReport _homeReportFromCachedSignal(CachedSignal signal) {
+    final keyword = signal.crisisTypeHint?.name ?? signal.title;
+    final color = _socialColor(keyword);
+    return _HomeReport(
+      icon: _socialIcon(keyword),
+      author: signal.sourceName,
+      handle: '@${signal.source.name}',
+      time: signal.freshnessLabel,
+      title: signal.title,
+      subtitle: signal.content,
+      tag: signal.contributesToActiveCrisis
+          ? 'Active input'
+          : signal.freshnessLabel,
+      location: signal.locationLabel,
+      color: color,
+      likes: (signal.rankScore / 4).round().clamp(4, 30),
+      views: (signal.rankScore * 1.4).round().clamp(18, 160),
+      isOfficial: signal.source != SignalSource.citizenReport,
+    );
   }
 }
 
@@ -2963,6 +3340,14 @@ IconData _crisisIcon(CrisisType type) => switch (type) {
   CrisisType.accident => Icons.car_crash_rounded,
   CrisisType.heatwave => Icons.thermostat_rounded,
   CrisisType.powerOutage => Icons.power_off_rounded,
+};
+
+String _crisisTypeLabel(CrisisType type) => switch (type) {
+  CrisisType.urbanFlooding => 'Urban Flooding',
+  CrisisType.roadBlockage => 'Road Blockage',
+  CrisisType.accident => 'Accident',
+  CrisisType.heatwave => 'Heatwave',
+  CrisisType.powerOutage => 'Power Outage',
 };
 
 IconData _socialIcon(String keyword) {

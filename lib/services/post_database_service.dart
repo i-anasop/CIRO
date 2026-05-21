@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'signal_cache_service.dart';
 
 // Firebase note: If you want to enable Firebase Firestore sync:
 // 1. Add cloud_firestore package to pubspec.yaml
@@ -51,6 +52,14 @@ class PostDatabaseService {
 
       savedList.insert(0, jsonEncode(postMap));
       await prefs.setStringList(_postsKey, savedList);
+      await SignalCacheService.instance.cacheUserReport(
+        title: title,
+        body: body,
+        location: location,
+        tag: tag,
+        latitude: latitude,
+        longitude: longitude,
+      );
 
       // ───────────────────────────────────────────────────────────────────────
       // FIREBASE SYNC HOOK (Uncomment when Firebase cloud_firestore is added):

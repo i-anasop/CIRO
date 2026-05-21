@@ -13,6 +13,7 @@ import '../models/orchestration_models.dart';
 import '../services/groq_service.dart';
 import '../services/app_config.dart';
 import '../services/real_signal_service.dart';
+import '../services/signal_cache_service.dart';
 
 /// Which AI engine is currently driving the pipeline.
 String get _activeEngine {
@@ -677,6 +678,18 @@ Rules:
 
     if (bundle.warnings.isNotEmpty) {
       parts.add('WARNINGS: ${bundle.warnings.join('; ')}');
+    }
+
+    final cachedSignals = SignalCacheService.instance.rankedSignals.take(8);
+    if (cachedSignals.isNotEmpty) {
+      parts.add('RECENT CACHED CITY SIGNALS [CIRO MEMORY]:');
+      for (final signal in cachedSignals) {
+        parts.add(
+          '  - ${signal.sourceName} | ${signal.freshnessLabel} | '
+          '${signal.severityHint.name} | ${(signal.confidence * 100).round()}% | '
+          '${signal.title}: ${signal.content}',
+        );
+      }
     }
 
     return parts.join('\n');
